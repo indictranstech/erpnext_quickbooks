@@ -8,14 +8,22 @@ from __future__ import unicode_literals
 import frappe
 from frappe.model.document import Document
 from frappe import _,msgprint
+from frappe.utils import cstr, flt, cint, get_files_path
 import httplib
 import urllib3
 from urlparse import parse_qsl
 import json
+import ast
 from rauth import OAuth1Session, OAuth1Service
 from erpnext_quickbooks.pyqb.quickbooks import QuickBooks
 from erpnext_quickbooks.exceptions import QuickbooksError
 from time import strftime
+from frappe.utils import flt, nowdate
+from erpnext_quickbooks.sync_customers import *
+from erpnext_quickbooks.sync_suppliers import *
+from erpnext_quickbooks.sync_products import *
+from erpnext_quickbooks.sync_employee import *
+from erpnext_quickbooks.sync_orders import *
 
 
 class QuickbooksSettings(Document):
@@ -58,10 +66,10 @@ def login_via_oauth2(realmId,oauth_verifier):
 	access_token_secret = quickbooks.access_token_secret 
 	
 	 
-	select = """SELECT displayname FROM  Customer""" 
-	data12 = quickbooks.query(select)
-	msgprint(_(data12['QueryResponse']))
-	return data12
+	# select = """SELECT displayname FROM  Customer""" 
+	# data12 = quickbooks.query(select)
+	# msgprint(_(data12['QueryResponse']))
+	# return data12
  
 @frappe.whitelist(allow_guest=True)
 def quickbooks_authentication_popup(consumer_key,consumer_secret):
@@ -100,71 +108,108 @@ def sync_quickbooks_data_erp():
         minorversion=4
     )
 
-	customer_data = create_customer(quickbooks_obj)
-	supplier_data = create_Supplier(quickbooks_obj)
-	Employee_data = create_Employee(quickbooks_obj)
-	if customer_data and supplier_data and Employee_data:
+	# customer_data = sync_customers(quickbooks_obj)
+	# supplier_data = sync_suppliers(quickbooks_obj)
+	# Employee_data = create_Employee(quickbooks_obj)
+	# Item_data = create_Item(quickbooks_obj)
+	#if customer_data and supplier_data and Employee_data and Item_data:
+
+	get_series = { "sales_invoice_series" : frappe.get_meta("Sales Invoice").get_options("naming_series")  or "SI-Quickbooks-",
+			"purchase_invoice_series" : frappe.get_meta("Purchase Invoice").get_options("naming_series")  or "PI-Quickbooks-"}
+	print get_series
+
+	#invoice_data = valid_customer_and_product(quickbooks_obj)
+	#invoice_data = sync_orders(quickbooks_obj,get_series)
+	invoice_data = sync_qb_orders()
+	if invoice_data:
 		return "Success"
 	else:
 		return "failed to update"
 
 
-def create_customer(quickbooks_obj):
-	""" Fetch Customer data from QuickBooks and store in ERPNEXT """ 
+def sync_orders(quickbooks_obj,get_series): 
+	quickbooks_invoice_list = []
+	#invoice_query = """SELECT * FROM Invoice""" 
+	invoice_query = """SELECT * FROM Invoice where DocNumber IN ('1016', '1015')"""
+	fetch_invoice_qb = quickbooks_obj.query(invoice_query)
+	qb_invoice =  fetch_invoice_qb['QueryResponse']	
+	sync_qb_orders(qb_invoice,get_series)
 
-	customer = None
-	customer_query = """SELECT DisplayName, Id FROM  Customer""" 
-	fetch_customer_qb = quickbooks_obj.query(customer_query)
-	qb_customer =  fetch_customer_qb['QueryResponse']
-		
-	customer = frappe.new_doc("Customer")
-	if qb_customer:
-		for fields in qb_customer['Customer']:
-			customer.customer_name = fields.get('DisplayName')
-			customer.customer_type = "Company"
-			customer.customer_group ="Commercial"
-			customer.territory = "All Territories"
-			customer.quickbooksid = str(fields.get('Id'))
-			customer.insert()
-	return customer
+def sync_qb_orders():
+	quickbooks_invoice_list = [] 
+	data = [{u'AllowOnlineACHPayment': False, u'domain': u'QBO', u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 130.0, u'PrintStatus': u'NotSet', u'BillEmail': {u'Address': u'jdrew@myemail.com'}, u'SalesTermRef': {u'value': u'3'}, u'GlobalTaxCalculation': u'NotApplicable', u'TotalAmt': 130.0, u'Line': [{u'Description': u'book of Dan brown', u'DetailType': u'SalesItemLineDetail', u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 120, u'ItemRef': {u'name': u'inventory Book', u'value': u'19'}}, u'LineNum': 1, u'Amount': 120.0, u'Id': u'1'}, {u'Description': u'nut & bolt as non inventory item', u'DetailType': u'SalesItemLineDetail', u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 10, u'ItemRef': {u'name': u'Nuts and bolt', u'value': u'20'}}, u'LineNum': 2, u'Amount': 10.0, u'Id': u'2'}, {u'DetailType': u'SubTotalLineDetail', u'Amount': 130.0, u'SubTotalLineDetail': {}}], u'DueDate': u'2016-05-22', u'MetaData': {u'CreateTime': u'2016-04-22T04:00:12-07:00', u'LastUpdatedTime': u'2016-04-22T04:07:21-07:00'}, u'DocNumber': u'1015', u'sparse': False, u'Deposit': 0, u'Balance': 130.0, u'CustomerRef': {u'name': u'Bond Jame', u'value': u'73'}, u'TxnTaxDetail': {u'TotalTax': 0}, u'AllowOnlineCreditCardPayment': False, u'SyncToken': u'1', u'LinkedTxn': [], u'ExchangeRate': 1, u'ShipAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'HomeTotalAmt': 130.0, u'TxnDate': u'2016-04-22', u'EmailStatus': u'NotSet', u'BillAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'CustomField': [], u'Id': u'152', u'AllowOnlinePayment': False, u'AllowIPNPayment': False}, {u'AllowOnlineACHPayment': False, u'domain': u'QBO', u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 100.0, u'PrintStatus': u'NotSet', u'BillEmail': {u'Address': u'jdrew@myemail.com'}, u'SalesTermRef': {u'value': u'3'}, u'GlobalTaxCalculation': u'NotApplicable', u'TotalAmt': 100.0, u'Line': [{u'LineNum': 1, u'Amount': 100.0, u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 100, u'ItemRef': {u'name': u'mouse', u'value': u'26'}}, u'Id': u'1', u'DetailType': u'SalesItemLineDetail'}, {u'DetailType': u'SubTotalLineDetail', u'Amount': 100.0, u'SubTotalLineDetail': {}}], u'DueDate': u'2016-05-22', u'MetaData': {u'CreateTime': u'2016-04-22T04:06:29-07:00', u'LastUpdatedTime': u'2016-04-22T04:06:29-07:00'}, u'DocNumber': u'1016', u'sparse': False, u'Deposit': 0, u'Balance': 100.0, u'CustomerRef': {u'name': u'Bond Jame', u'value': u'73'}, u'TxnTaxDetail': {u'TotalTax': 0}, u'AllowOnlineCreditCardPayment': False, u'SyncToken': u'0', u'LinkedTxn': [], u'ExchangeRate': 1, u'ShipAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'HomeTotalAmt': 100.0, u'TxnDate': u'2016-04-22', u'EmailStatus': u'NotSet', u'BillAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'CustomField': [], u'Id': u'154', u'AllowOnlinePayment': False, u'AllowIPNPayment': False}]
+	#for qb_orders in qb_invoice['Invoice']:
+	for qb_orders in data:
+		if valid_customer_and_product(qb_orders):
+			try:
+				create_order(qb_orders,quickbooks_invoice_list)
+			except Exception, e:
+				if e.args[0] and e.args[0].startswith("402"):
+					raise e
+				
+def valid_customer_and_product(qb_orders):
+	""" Fetch Invoice data from QuickBooks and store in ERPNEXT """ 
+	customer_id = qb_orders['CustomerRef'].get('value') 
+	if customer_id:
+		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": customer_id}, "name"):
+			json_data = json.dumps(qb_orders['CustomerRef'])
+			create_customer(ast.literal_eval(json_data),quickbooks_customer_list = [])		
+	else:
+		raise _("Customer is mandatory to create order")
+	
+	return True
+
+def create_order(qb_orders,quickbooks_invoice_list,company=None):
+	create_sales_invoice(qb_orders,quickbooks_invoice_list,company=None)
 
 
 
-def create_Supplier(quickbooks_obj):
-	""" Fetch Supplier data from QuickBooks and store in ERPNEXT """ 
 
-	supplier = None
-	supplier_query = """SELECT  DisplayName, CurrencyRef, Id FROM  Vendor""" 
-	fetch_vendor_qb = quickbooks_obj.query(supplier_query)
-	qb_supplier =  fetch_vendor_qb['QueryResponse']
-		
-	supplier = frappe.new_doc("Supplier")
-	if qb_supplier:
-		for fields in qb_supplier['Vendor']:
-			supplier.supplier_name = fields.get('DisplayName')
-			supplier.supplier_type = "Distributor"
-			supplier.default_currency =fields['CurrencyRef'].get('value','') if fields.get('CurrencyRef') else ''
-			supplier.quickbooks_id = str(fields.get('Id'))
-			supplier.insert()
-	return supplier
+def create_sales_invoice(qb_orders,quickbooks_invoice_list,company=None):
+	print "osmosis",qb_orders
+	print "qb_orders.get(id)",qb_orders.get("Id")
+	print "get line",get_order_items(qb_orders['Line'])
+	print "abc",frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory")
+	print "-------------",frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name")
+	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": qb_orders.get("id")}, "name")
+	if not si:
+		si = frappe.new_doc("Sales Invoice")
+		si.quickbooks_invoce_id = qb_orders.get("id")
+		si.naming_series ="SO-Quickbooks-"
+		si.customer = frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name")
+		si.posting_date = nowdate()
+		si.selling_price_list = "Standard Selling"
+		si.ignore_pricing_rule = 1
+		si.territory = frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory")
+		si.debit_to = "Debtors - ES"
+		si.items = get_order_items(qb_orders['Line'][0])
+		si.apply_discount_on = "Net Total"
+		quickbooks_invoice_list.append(qb_orders.get("id"))
+		si.flags.ignore_mandatory = True
+		si.save(ignore_permissions=True)
+		si.submit()
+		frappe.db.commit()
+	return quickbooks_invoice_list
 
-def create_Employee(quickbooks_obj):
-	""" Fetch Employee data from QuickBooks and store in ERPNEXT """ 
+def get_order_items(order_items):
+	items = []
+	for qb_item in order_items[0]:
+		item_code = get_item_code(qb_item)
+		items.append({
+			"item_code": item_code,
+			"item_name": item_code,
+			"rate": qb_item.get("UnitPrice"),
+			"qty": qb_item.get("Qty"),
+			"stock_uom": _("Nos"),
+			"warehouse": "Finished Goods - ES"
+		})
+	print "items",items
+	return items
 
-	employee = None
-	employee_query = """SELECT Id, DisplayName, PrimaryPhone, Gender, PrimaryEmailAddr, BirthDate, HiredDate, ReleasedDate FROM Employee""" 
-	fetch_employee_qb = quickbooks_obj.query(employee_query)
-	qb_employee =  fetch_employee_qb['QueryResponse']
-		
-	employee = frappe.new_doc("Employee")
-	if qb_employee:
-		for fields in qb_employee['Employee']:
-			employee.employee_name = fields.get('DisplayName')
-			#employee.quickbooks_emp_id = str(fields.get('Id'))
-			employee.date_of_joining = fields.get('HiredDate') if fields.get('HiredDate') else strftime("%Y-%m-%d")
-			employee.date_of_birth = fields.get('BirthDate') if fields.get('BirthDate') else "2016-04-01"
-			employee.gender = fields.get('Gender') if fields.get('Gender') else "Male"
-			employee.cell_number =fields['Mobile'].get('FreeFormNumber','') if fields.get('Mobile') else ''
-			employee.personal_email =fields['PrimaryEmailAddr'].get('Address','') if fields.get('PrimaryEmailAddr') else ''
-			employee.insert()
-	return employee
+def get_item_code(qb_item):
+	item_code = frappe.db.get_value("Item", {"quickbooks_variant_id": qb_item.get("variant_id")}, "item_code")
+	print "item_code",item_code
+	if not item_code:
+		item_code = frappe.db.get_value("Item", {"quickbooks_item_id": qb_item.get("product_id")}, "item_code")
+
+	return item_code
