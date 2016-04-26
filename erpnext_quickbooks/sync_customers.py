@@ -20,12 +20,12 @@ def sync_qb_customers(get_qb_customer,quickbooks_customer_list):
 
 def create_customer(qb_customer,quickbooks_customer_list):
 	""" store in ERPNEXT """ 
-	
+	print "qb__customer",qb_customer
 	customer = None
 	try:	
 		customer = frappe.new_doc("Customer")
-		customer.quickbooks_cust_id = str(qb_customer.get('Id')) if not str(qb_customer.get('Id'))  else str(qb_customer.get('value'))
-		customer.customer_name = str(qb_customer.get('DisplayName')) if not str(qb_customer.get('DisplayName'))  else str(qb_customer.get('name'))
+		customer.quickbooks_cust_id = str(qb_customer.get('Id')) if qb_customer.get('Id')  else str(qb_customer.get('value'))
+		customer.customer_name = str(qb_customer.get('DisplayName')) if qb_customer.get('DisplayName')  else str(qb_customer.get('name'))
 		customer.customer_type = "Company"
 		customer.customer_group ="Commercial"
 		customer.territory = "All Territories"
