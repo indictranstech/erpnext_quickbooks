@@ -25,8 +25,8 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 	supplier = None
 	try:	
 		supplier = frappe.new_doc("Supplier")
-		supplier.quickbooks_supp_id = str(qb_supplier.get('Id')) if not str(qb_supplier.get('Id'))  else str(qb_supplier.get('value'))
-		supplier.supplier_name = str(qb_supplier.get('DisplayName')) if not str(qb_supplier.get('DisplayName'))  else str(qb_supplier.get('name'))
+		supplier.quickbooks_supp_id = str(qb_supplier.get('Id')) if qb_supplier.get('Id')  else str(qb_supplier.get('value'))
+		supplier.supplier_name = str(qb_supplier.get('DisplayName')) if qb_supplier.get('DisplayName')  else str(qb_supplier.get('name'))
 		supplier.supplier_type = "Distributor"
 		supplier.default_currency =qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else ''
 		supplier.insert()
