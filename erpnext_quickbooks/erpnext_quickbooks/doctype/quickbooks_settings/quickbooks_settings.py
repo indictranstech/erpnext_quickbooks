@@ -8,14 +8,22 @@ from __future__ import unicode_literals
 import frappe
 from frappe.model.document import Document
 from frappe import _,msgprint
+from frappe.utils import cstr, flt, cint, get_files_path
 import httplib
 import urllib3
 from urlparse import parse_qsl
 import json
+import ast
 from rauth import OAuth1Session, OAuth1Service
 from erpnext_quickbooks.pyqb.quickbooks import QuickBooks
 from erpnext_quickbooks.exceptions import QuickbooksError
 from time import strftime
+from frappe.utils import flt, nowdate
+from erpnext_quickbooks.sync_customers import *
+from erpnext_quickbooks.sync_suppliers import *
+from erpnext_quickbooks.sync_products import *
+from erpnext_quickbooks.sync_employee import *
+from erpnext_quickbooks.sync_orders import *
 
 
 class QuickbooksSettings(Document):
@@ -56,13 +64,7 @@ def login_via_oauth2(realmId,oauth_verifier):
 	realm_id = realmId
 	access_token = quickbooks.access_token
 	access_token_secret = quickbooks.access_token_secret 
-	
-	 
-	select = """SELECT displayname FROM  Customer""" 
-	data12 = quickbooks.query(select)
-	msgprint(_(data12['QueryResponse']))
-	return data12
- 
+		 
 @frappe.whitelist(allow_guest=True)
 def quickbooks_authentication_popup(consumer_key,consumer_secret):
 	""" Open new popup window to Connect Quickbooks App to Quickbooks sandbox Account """
@@ -100,71 +102,25 @@ def sync_quickbooks_data_erp():
         minorversion=4
     )
 
-	customer_data = create_customer(quickbooks_obj)
-	supplier_data = create_Supplier(quickbooks_obj)
+	customer_data = sync_customers(quickbooks_obj)
+	supplier_data = sync_suppliers(quickbooks_obj)
 	Employee_data = create_Employee(quickbooks_obj)
-	if customer_data and supplier_data and Employee_data:
+	Item_data = create_Item(quickbooks_obj)
+	invoice_data = sync_qb_orders()
+	if customer_data and supplier_data and Employee_data and Item_data and invoice_data:
 		return "Success"
 	else:
 		return "failed to update"
-
-
-def create_customer(quickbooks_obj):
-	""" Fetch Customer data from QuickBooks and store in ERPNEXT """ 
-
-	customer = None
-	customer_query = """SELECT DisplayName, Id FROM  Customer""" 
-	fetch_customer_qb = quickbooks_obj.query(customer_query)
-	qb_customer =  fetch_customer_qb['QueryResponse']
 		
-	customer = frappe.new_doc("Customer")
-	if qb_customer:
-		for fields in qb_customer['Customer']:
-			customer.customer_name = fields.get('DisplayName')
-			customer.customer_type = "Company"
-			customer.customer_group ="Commercial"
-			customer.territory = "All Territories"
-			customer.quickbooksid = str(fields.get('Id'))
-			customer.insert()
-	return customer
+	# get_series = { "sales_invoice_series" : frappe.get_meta("Sales Invoice").get_options("naming_series")  or "SI-Quickbooks-",
+	# 		"purchase_invoice_series" : frappe.get_meta("Purchase Invoice").get_options("naming_series")  or "PI-Quickbooks-"}
+	# print get_series
+
+	# #invoice_data = sync_orders(quickbooks_obj,get_series)
+	# invoice_data = sync_qb_orders()
+	# if invoice_data:
+	# 	return "Success"
+	# else:
+	# 	return "failed to update"
 
 
-
-def create_Supplier(quickbooks_obj):
-	""" Fetch Supplier data from QuickBooks and store in ERPNEXT """ 
-
-	supplier = None
-	supplier_query = """SELECT  DisplayName, CurrencyRef, Id FROM  Vendor""" 
-	fetch_vendor_qb = quickbooks_obj.query(supplier_query)
-	qb_supplier =  fetch_vendor_qb['QueryResponse']
-		
-	supplier = frappe.new_doc("Supplier")
-	if qb_supplier:
-		for fields in qb_supplier['Vendor']:
-			supplier.supplier_name = fields.get('DisplayName')
-			supplier.supplier_type = "Distributor"
-			supplier.default_currency =fields['CurrencyRef'].get('value','') if fields.get('CurrencyRef') else ''
-			supplier.quickbooks_id = str(fields.get('Id'))
-			supplier.insert()
-	return supplier
-
-def create_Employee(quickbooks_obj):
-	""" Fetch Employee data from QuickBooks and store in ERPNEXT """ 
-
-	employee = None
-	employee_query = """SELECT Id, DisplayName, PrimaryPhone, Gender, PrimaryEmailAddr, BirthDate, HiredDate, ReleasedDate FROM Employee""" 
-	fetch_employee_qb = quickbooks_obj.query(employee_query)
-	qb_employee =  fetch_employee_qb['QueryResponse']
-		
-	employee = frappe.new_doc("Employee")
-	if qb_employee:
-		for fields in qb_employee['Employee']:
-			employee.employee_name = fields.get('DisplayName')
-			#employee.quickbooks_emp_id = str(fields.get('Id'))
-			employee.date_of_joining = fields.get('HiredDate') if fields.get('HiredDate') else strftime("%Y-%m-%d")
-			employee.date_of_birth = fields.get('BirthDate') if fields.get('BirthDate') else "2016-04-01"
-			employee.gender = fields.get('Gender') if fields.get('Gender') else "Male"
-			employee.cell_number =fields['Mobile'].get('FreeFormNumber','') if fields.get('Mobile') else ''
-			employee.personal_email =fields['PrimaryEmailAddr'].get('Address','') if fields.get('PrimaryEmailAddr') else ''
-			employee.insert()
-	return employee
