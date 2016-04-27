@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 import frappe
 from frappe import _
 import requests.exceptions
+from frappe.utils import cstr, flt, cint
 
 
 def create_Item(quickbooks_obj):
@@ -20,7 +21,6 @@ def create_Item(quickbooks_obj):
 			if not frappe.db.get_value("Item", {"quickbooks_item_id": str(fields.get('Id'))}, "name"):
 				item.quickbooks_item_id = cstr(fields.get('Id'))
 				item.quickbooks_item_synctoken = cstr(fields.get('SyncToken'))
-				#item.modified = fields['MetaData'].get('LastUpdatedTime')
 				item.item_code = cstr(fields.get('Name')) or cstr(fields.get('Id'))
 				item.item_name = cstr(fields.get('Name'))
 				item.is_sales_item = 1
