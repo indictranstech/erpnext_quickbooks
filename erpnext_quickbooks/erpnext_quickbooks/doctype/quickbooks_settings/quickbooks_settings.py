@@ -106,8 +106,8 @@ def sync_quickbooks_data_erp():
 	supplier_data = sync_suppliers(quickbooks_obj)
 	Employee_data = create_Employee(quickbooks_obj)
 	Item_data = create_Item(quickbooks_obj)
-	invoice_data = sync_qb_orders()
-	if customer_data and supplier_data and Employee_data and Item_data and invoice_data:
+	invoice_data = sync_orders(quickbooks_obj)
+	if customer_data and supplier_data and Employee_data and Item_data:
 		return "Success"
 	else:
 		return "failed to update"
@@ -116,7 +116,6 @@ def sync_quickbooks_data_erp():
 	# 		"purchase_invoice_series" : frappe.get_meta("Purchase Invoice").get_options("naming_series")  or "PI-Quickbooks-"}
 	# print get_series
 
-	# #invoice_data = sync_orders(quickbooks_obj,get_series)
 	# invoice_data = sync_qb_orders()
 	# if invoice_data:
 	# 	return "Success"
