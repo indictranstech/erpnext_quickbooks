@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 import frappe
 from frappe import _
+from frappe.utils import flt, nowdate
 import requests.exceptions
 
 
@@ -13,13 +14,13 @@ def sync_orders(quickbooks_obj,get_series):
 	qb_invoice =  fetch_invoice_qb['QueryResponse']	
 	sync_qb_orders(qb_invoice)
 
-def sync_qb_orders():
+def sync_qb_orders(qb_invoice):
 	quickbooks_invoice_list = [] 
-	data = [{u'AllowOnlineACHPayment': False, u'domain': u'QBO', u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 130.0, u'PrintStatus': u'NotSet', u'BillEmail': {u'Address': u'jdrew@myemail.com'}, u'SalesTermRef': {u'value': u'3'}, u'GlobalTaxCalculation': u'NotApplicable', u'TotalAmt': 130.0, u'Line': [{u'Description': u'book of Dan brown', u'DetailType': u'SalesItemLineDetail', u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 120, u'ItemRef': {u'name': u'inventory Book', u'value': u'19'}}, u'LineNum': 1, u'Amount': 120.0, u'Id': u'1'}, {u'Description': u'nut & bolt as non inventory item', u'DetailType': u'SalesItemLineDetail', u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 10, u'ItemRef': {u'name': u'Nuts and bolt', u'value': u'20'}}, u'LineNum': 2, u'Amount': 10.0, u'Id': u'2'}, {u'DetailType': u'SubTotalLineDetail', u'Amount': 130.0, u'SubTotalLineDetail': {}}], u'DueDate': u'2016-05-22', u'MetaData': {u'CreateTime': u'2016-04-22T04:00:12-07:00', u'LastUpdatedTime': u'2016-04-22T04:07:21-07:00'}, u'DocNumber': u'1015', u'sparse': False, u'Deposit': 0, u'Balance': 130.0, u'CustomerRef': {u'name': u'Bond Jame', u'value': u'73'}, u'TxnTaxDetail': {u'TotalTax': 0}, u'AllowOnlineCreditCardPayment': False, u'SyncToken': u'1', u'LinkedTxn': [], u'ExchangeRate': 1, u'ShipAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'HomeTotalAmt': 130.0, u'TxnDate': u'2016-04-22', u'EmailStatus': u'NotSet', u'BillAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'CustomField': [], u'Id': u'152', u'AllowOnlinePayment': False, u'AllowIPNPayment': False}, {u'AllowOnlineACHPayment': False, u'domain': u'QBO', u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 100.0, u'PrintStatus': u'NotSet', u'BillEmail': {u'Address': u'jdrew@myemail.com'}, u'SalesTermRef': {u'value': u'3'}, u'GlobalTaxCalculation': u'NotApplicable', u'TotalAmt': 100.0, u'Line': [{u'LineNum': 1, u'Amount': 100.0, u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 100, u'ItemRef': {u'name': u'mouse', u'value': u'26'}}, u'Id': u'1', u'DetailType': u'SalesItemLineDetail'}, {u'DetailType': u'SubTotalLineDetail', u'Amount': 100.0, u'SubTotalLineDetail': {}}], u'DueDate': u'2016-05-22', u'MetaData': {u'CreateTime': u'2016-04-22T04:06:29-07:00', u'LastUpdatedTime': u'2016-04-22T04:06:29-07:00'}, u'DocNumber': u'1016', u'sparse': False, u'Deposit': 0, u'Balance': 100.0, u'CustomerRef': {u'name': u'Bond Jame', u'value': u'73'}, u'TxnTaxDetail': {u'TotalTax': 0}, u'AllowOnlineCreditCardPayment': False, u'SyncToken': u'0', u'LinkedTxn': [], u'ExchangeRate': 1, u'ShipAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'HomeTotalAmt': 100.0, u'TxnDate': u'2016-04-22', u'EmailStatus': u'NotSet', u'BillAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'CustomField': [], u'Id': u'154', u'AllowOnlinePayment': False, u'AllowIPNPayment': False}]
-	#for qb_orders in qb_invoice['Invoice']:
-	for qb_orders in data:
+	#data = [{u'AllowOnlineACHPayment': False, u'domain': u'QBO', u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 130.0, u'PrintStatus': u'NotSet', u'BillEmail': {u'Address': u'jdrew@myemail.com'}, u'SalesTermRef': {u'value': u'3'}, u'GlobalTaxCalculation': u'NotApplicable', u'TotalAmt': 130.0, u'Line': [{u'Description': u'book of Dan brown', u'DetailType': u'SalesItemLineDetail', u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 120, u'ItemRef': {u'name': u'inventory Book', u'value': u'19'}}, u'LineNum': 1, u'Amount': 120.0, u'Id': u'1'}, {u'Description': u'nut & bolt as non inventory item', u'DetailType': u'SalesItemLineDetail', u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 10, u'ItemRef': {u'name': u'Nuts and bolt', u'value': u'20'}}, u'LineNum': 2, u'Amount': 10.0, u'Id': u'2'}, {u'DetailType': u'SubTotalLineDetail', u'Amount': 130.0, u'SubTotalLineDetail': {}}], u'DueDate': u'2016-05-22', u'MetaData': {u'CreateTime': u'2016-04-22T04:00:12-07:00', u'LastUpdatedTime': u'2016-04-22T04:07:21-07:00'}, u'DocNumber': u'1015', u'sparse': False, u'Deposit': 0, u'Balance': 130.0, u'CustomerRef': {u'name': u'Bond Jame', u'value': u'73'}, u'TxnTaxDetail': {u'TotalTax': 0}, u'AllowOnlineCreditCardPayment': False, u'SyncToken': u'1', u'LinkedTxn': [], u'ExchangeRate': 1, u'ShipAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'HomeTotalAmt': 130.0, u'TxnDate': u'2016-04-22', u'EmailStatus': u'NotSet', u'BillAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'CustomField': [], u'Id': u'152', u'AllowOnlinePayment': False, u'AllowIPNPayment': False}, {u'AllowOnlineACHPayment': False, u'domain': u'QBO', u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 100.0, u'PrintStatus': u'NotSet', u'BillEmail': {u'Address': u'jdrew@myemail.com'}, u'SalesTermRef': {u'value': u'3'}, u'GlobalTaxCalculation': u'NotApplicable', u'TotalAmt': 100.0, u'Line': [{u'LineNum': 1, u'Amount': 100.0, u'SalesItemLineDetail': {u'Qty': 1, u'UnitPrice': 100, u'ItemRef': {u'name': u'mouse', u'value': u'26'}}, u'Id': u'1', u'DetailType': u'SalesItemLineDetail'}, {u'DetailType': u'SubTotalLineDetail', u'Amount': 100.0, u'SubTotalLineDetail': {}}], u'DueDate': u'2016-05-22', u'MetaData': {u'CreateTime': u'2016-04-22T04:06:29-07:00', u'LastUpdatedTime': u'2016-04-22T04:06:29-07:00'}, u'DocNumber': u'1016', u'sparse': False, u'Deposit': 0, u'Balance': 100.0, u'CustomerRef': {u'name': u'Bond Jame', u'value': u'73'}, u'TxnTaxDetail': {u'TotalTax': 0}, u'AllowOnlineCreditCardPayment': False, u'SyncToken': u'0', u'LinkedTxn': [], u'ExchangeRate': 1, u'ShipAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'HomeTotalAmt': 100.0, u'TxnDate': u'2016-04-22', u'EmailStatus': u'NotSet', u'BillAddr': {u'City': u'kota', u'Country': u'India', u'Line1': u'A- 108 shivam enclave bajrang nagar', u'PostalCode': u'324006', u'Lat': u'25.17941', u'Long': u'75.86330769999999', u'CountrySubDivisionCode': u'Rajasthan', u'Id': u'13'}, u'CustomField': [], u'Id': u'154', u'AllowOnlinePayment': False, u'AllowIPNPayment': False}]
+	# for qb_orders in data:
+	for qb_orders in qb_invoice['Invoice']:
 		if valid_customer_and_product(qb_orders):
-			#create_order(qb_orders,quickbooks_invoice_list)
+			# create_order(qb_orders,quickbooks_invoice_list)
 			try:
 				create_order(qb_orders,quickbooks_invoice_list)
 			except Exception, e:
@@ -54,7 +55,6 @@ def create_sales_invoice(qb_orders,quickbooks_invoice_list,company=None):
 			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory"),
 			"selling_price_list": "Standard Selling",
 			"ignore_pricing_rule": 1,
-			"debit_to" : "Debtors - ES",
 			"apply_discount_on": "Net Total",
 			"items": get_order_items(qb_orders['Line'])
 		})
@@ -74,9 +74,7 @@ def get_order_items(order_items):
 			"item_name": item_code,
 			"rate": order_items[qb_item].get('SalesItemLineDetail').get('UnitPrice'),
 			"qty": order_items[qb_item].get('SalesItemLineDetail').get('Qty'),
-			"stock_uom": _("Nos"),
-			"warehouse": "Finished Goods - ES",
-			"income_account":"Sales - ES"
+			"stock_uom": _("Nos")			
 		})
 	return items
 
