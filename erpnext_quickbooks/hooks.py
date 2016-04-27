@@ -111,3 +111,4 @@ app_license = "GNU GPL v3.0"
 # 	"frappe.desk.doctype.event.event.get_events": "erpnext_quickbooks.event.get_events"
 # }
 
+fixtures=['Custom Script','Property Setter','Custom Field']
