@@ -8,6 +8,12 @@ ERPNext Quickbooks is built on the [Frappé](https://github.com/frappe/frappe) F
 
 Requires [EPRNext](https://github.com/frappe/erpnext), 
 
+Once you install ERPNext run -
+
+```
+$ bench get-app erpnext_quickbooks https://github.com/indictranstech/erpnext_quickbooks.git
+$ bench install-app erpnext_quickbooks
+```
 
 
 This Connector will Sync the data from Quickbooks Online to ERPNext
@@ -18,15 +24,20 @@ Go to this Url (https://developer.intuit.com) and create Quickbooks account , Af
 This process has to be done only once.
 
 
+Setups 
+1. Insert both the key
+
 ![Erp_quickbooks](erpnext_quickbooks/public/erp_quickbooks.png)
 
+2. Click "Connect to Quickbooks" Button , after that new pop window will open 
 
-Once you install ERPNext run -
+![Screenshot1](erpnext_quickbooks/public/Screenshot1.png)
 
-```
-$ bench get-app erpnext_quickbooks https://github.com/indictranstech/erpnext_quickbooks.git
-$ bench install-app erpnext_quickbooks
-```
+3. Click Authorize Button 
+
+![Screenshot2](erpnext_quickbooks/public/Screenshot2.png)
+
+
 
 #### License
 
