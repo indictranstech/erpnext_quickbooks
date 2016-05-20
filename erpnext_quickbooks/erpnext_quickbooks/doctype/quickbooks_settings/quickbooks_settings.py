@@ -24,6 +24,11 @@ from erpnext_quickbooks.sync_suppliers import *
 from erpnext_quickbooks.sync_products import *
 from erpnext_quickbooks.sync_employee import *
 from erpnext_quickbooks.sync_orders import *
+#from erpnext_quickbooks.devlop import *
+from erpnext_quickbooks.Account_json import *
+from erpnext_quickbooks.sync_journal_vouchers import sync_entries,payment_invoice
+from erpnext_quickbooks.sync_entries import sync_qb_journal_entry,sync_entry
+#from erpnext.accounts.doctype.journal_entry.journal_entry import get_payment_entry_against_invoice
 
 
 class QuickbooksSettings(Document):
@@ -41,10 +46,11 @@ callback_url=""
 
 
 @frappe.whitelist(allow_guest=True)
-def First_callback(realmId,oauth_verifier):
-	login_via_oauth2(realmId,oauth_verifier)
+def First_callback(realmId, oauth_verifier):
+	login_via_oauth2(realmId, oauth_verifier)
 
-def login_via_oauth2(realmId,oauth_verifier):
+
+def login_via_oauth2(realmId, oauth_verifier):
 	""" Store necessary token's to Setup service """
 	global realm_id
 	global access_token
@@ -64,9 +70,10 @@ def login_via_oauth2(realmId,oauth_verifier):
 	realm_id = realmId
 	access_token = quickbooks.access_token
 	access_token_secret = quickbooks.access_token_secret 
+	
 		 
 @frappe.whitelist(allow_guest=True)
-def quickbooks_authentication_popup(consumer_key,consumer_secret):
+def quickbooks_authentication_popup(consumer_key, consumer_secret):
 	""" Open new popup window to Connect Quickbooks App to Quickbooks sandbox Account """
 
 	global authorize_url
@@ -101,25 +108,20 @@ def sync_quickbooks_data_erp():
         company_id=realm_id,
         minorversion=4
     )
-
+  
 	customer_data = sync_customers(quickbooks_obj)
 	supplier_data = sync_suppliers(quickbooks_obj)
 	Employee_data = create_Employee(quickbooks_obj)
 	Item_data = create_Item(quickbooks_obj)
 	invoice_data = sync_orders(quickbooks_obj)
+	sync_entry(quickbooks_obj)
+	payment_invoice(quickbooks_obj)
+	
 	if customer_data and supplier_data and Employee_data and Item_data:
 		return "Success"
 	else:
 		return "failed to update"
-		
-	# get_series = { "sales_invoice_series" : frappe.get_meta("Sales Invoice").get_options("naming_series")  or "SI-Quickbooks-",
-	# 		"purchase_invoice_series" : frappe.get_meta("Purchase Invoice").get_options("naming_series")  or "PI-Quickbooks-"}
-	# print get_series
-
-	# invoice_data = sync_qb_orders()
-	# if invoice_data:
-	# 	return "Success"
-	# else:
-	# 	return "failed to update"
-
-
+	# sync_qb_journal_entry(payment1)
+	# sync_qb_journal_entry(payment1)
+	# sync_entries(journal_entry1)
+	#payment_invoice(quickbooks_obj)
