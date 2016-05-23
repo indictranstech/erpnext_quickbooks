@@ -19,11 +19,6 @@ def sync_qb_accounts(get_qb_account, quickbooks_account_list):
 		if not frappe.db.get_value("Account", {"quickbooks_account_id": qb_account.get('id')}, "name"):
 			create_account(qb_account, quickbooks_account_list)
 
-# def sync_qb_accounts(data):
-# 	for qb_account in data:
-# 		if not frappe.db.get_value("Account", {"quickbooks_account_id": qb_account.get('Id')}, "name"):
-# 			create_account(qb_account, quickbooks_account_list =[])
-
 def create_account(qb_account, quickbooks_account_list):
 	""" store Account data in ERPNEXT """ 
 	account = None
