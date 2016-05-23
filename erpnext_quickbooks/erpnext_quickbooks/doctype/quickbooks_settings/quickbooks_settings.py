@@ -26,9 +26,10 @@ from erpnext_quickbooks.sync_employee import *
 from erpnext_quickbooks.sync_orders import *
 #from erpnext_quickbooks.devlop import *
 from erpnext_quickbooks.Account_json import *
-from erpnext_quickbooks.sync_journal_vouchers import sync_entries,payment_invoice
-from erpnext_quickbooks.sync_entries import sync_qb_journal_entry,sync_entry
-#from erpnext.accounts.doctype.journal_entry.journal_entry import get_payment_entry_against_invoice
+from erpnext_quickbooks.sync_journal_vouchers import sync_entry
+from erpnext_quickbooks.sync_entries import payment_invoice
+
+
 
 
 class QuickbooksSettings(Document):
