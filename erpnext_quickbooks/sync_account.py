@@ -27,18 +27,20 @@ def sync_qb_accounts(get_qb_account, quickbooks_account_list):
 def create_account(qb_account, quickbooks_account_list):
 	""" store Account data in ERPNEXT """ 
 	account = None
+	account_type = None
 	root_type = None
 	parent_account = None
 	Default_company = frappe.defaults.get_defaults().get("company")
+	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
 	
 	if qb_account.get('Classification') == "Asset":
-		parent_account = frappe.db.get_value("Account",{"company":Default_company,"name":"Debtors - ES"},"parent_account")
+		parent_account = _("Accounts Receivable") + " - " + Company_abbr
 		root_type = "Asset"
 	elif qb_account.get('Classification') == "Liability":
-		parent_account = frappe.db.get_value("Account",{"company":Default_company,"name":"Accounts Payable - ES"},"parent_account")
+		parent_account = _("Accounts Payable") + " - " + Company_abbr
 		root_type = "Liability"
 	else:
-		parent_account = frappe.db.get_value("Account",{"company":Default_company,"name":"Indirect Expenses - ES"},"parent_account") 
+		parent_account = _("Direct Expenses") + " - " + Company_abbr
 		root_type = "Expense"
 		
 	try:	
