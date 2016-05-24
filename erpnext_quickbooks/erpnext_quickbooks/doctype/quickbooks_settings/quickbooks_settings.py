@@ -25,9 +25,10 @@ from erpnext_quickbooks.sync_products import *
 from erpnext_quickbooks.sync_employee import *
 from erpnext_quickbooks.sync_orders import *
 #from erpnext_quickbooks.devlop import *
-from erpnext_quickbooks.Account_json import *
+#from erpnext_quickbooks.Account_json import *
 from erpnext_quickbooks.sync_journal_vouchers import sync_entry
 from erpnext_quickbooks.sync_entries import payment_invoice
+from erpnext_quickbooks.sync_account import sync_Account
 
 
 
@@ -117,6 +118,7 @@ def sync_quickbooks_data_erp():
 	invoice_data = sync_orders(quickbooks_obj)
 	sync_entry(quickbooks_obj)
 	payment_invoice(quickbooks_obj)
+	sync_Account(quickbooks_obj)
 	
 	if customer_data and supplier_data and Employee_data and Item_data:
 		return "Success"
