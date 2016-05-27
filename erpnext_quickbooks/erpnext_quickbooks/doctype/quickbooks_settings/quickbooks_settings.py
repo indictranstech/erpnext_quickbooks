@@ -24,10 +24,9 @@ from erpnext_quickbooks.sync_suppliers import *
 from erpnext_quickbooks.sync_products import *
 from erpnext_quickbooks.sync_employee import *
 from erpnext_quickbooks.sync_orders import *
-#from erpnext_quickbooks.devlop import *
-#from erpnext_quickbooks.Account_json import *
+from erpnext_quickbooks.sync_purchase_invoice import *
 from erpnext_quickbooks.sync_journal_vouchers import sync_entry
-from erpnext_quickbooks.sync_entries import payment_invoice
+from erpnext_quickbooks.sync_entries import *
 from erpnext_quickbooks.sync_account import sync_Account
 
 
@@ -110,21 +109,27 @@ def sync_quickbooks_data_erp():
         company_id=realm_id,
         minorversion=4
     )
-  
-	customer_data = sync_customers(quickbooks_obj)
+ 
+ 	customer_data = sync_customers(quickbooks_obj)
 	supplier_data = sync_suppliers(quickbooks_obj)
 	Employee_data = create_Employee(quickbooks_obj)
 	Item_data = create_Item(quickbooks_obj)
-	invoice_data = sync_orders(quickbooks_obj)
+	sync_Account(quickbooks_obj)
+	invoice_data = sync_si_orders(quickbooks_obj)
+ 	sync_pi_orders(quickbooks_obj)
 	sync_entry(quickbooks_obj)
 	payment_invoice(quickbooks_obj)
-	sync_Account(quickbooks_obj)
 	
 	if customer_data and supplier_data and Employee_data and Item_data:
 		return "Success"
 	else:
 		return "failed to update"
+
+	# Sync_erp_customer(quickbooks_obj)
+
 	# sync_qb_journal_entry(payment1)
-	# sync_qb_journal_entry(payment1)
+	#sync_qb_journal_entry(payment1)
 	# sync_entries(journal_entry1)
 	#payment_invoice(quickbooks_obj)
+	# sync_orders(quickbooks_obj)
+	
