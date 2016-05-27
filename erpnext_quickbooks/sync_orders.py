@@ -5,29 +5,27 @@ from frappe.utils import flt, nowdate
 import requests.exceptions
 from .utils import make_quickbooks_log
 
-
-def sync_orders(quickbooks_obj): 
+"""Sync all the Sales Invoice from Quickbooks to ERPNEXT"""
+def sync_si_orders(quickbooks_obj): 
 	"""Fetch invoice data from QuickBooks"""
-	quickbooks_invoice_list = []
+	quickbooks_invoice_list = [] 
 	invoice_query = """SELECT * FROM Invoice""" 
 	qb_invoice = quickbooks_obj.query(invoice_query)
 	get_qb_invoice =  qb_invoice['QueryResponse']	
-	sync_qb_orders(get_qb_invoice)
+	sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
 
-def sync_qb_orders(get_qb_invoice):
-	quickbooks_invoice_list = [] 
+def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
 	for qb_orders in get_qb_invoice['Invoice']:
 		if valid_customer_and_product(qb_orders):
-			# create_order(qb_orders,quickbooks_invoice_list)
 			try:
 				create_order(qb_orders, quickbooks_invoice_list)
 			except Exception, e:
 				if e.args[0] and e.args[0].startswith("402"):
 					raise e
 				else:
-					make_quickbooks_log(title=e.message, status="Error", method="sync_qb_orders", message=frappe.get_traceback(),
+					make_quickbooks_log(title=e.message, status="Error", method="sync_qb_si_orders", message=frappe.get_traceback(),
 						request_data=qb_orders, exception=True)
-				
+					
 def valid_customer_and_product(qb_orders):
 	""" Fetch valid_customer data from ERPNEXT and store in ERPNEXT """ 
 	customer_id = qb_orders['CustomerRef'].get('value') 
@@ -50,7 +48,7 @@ def create_sales_invoice(qb_orders, quickbooks_invoice_list, company=None):
 		si = frappe.get_doc({
 			"doctype": "Sales Invoice",
 			"quickbooks_invoce_id" : qb_orders.get("Id"),
-			"naming_series": "SO-Quickbooks-",
+			"naming_series": "SI-Quickbooks-",
 			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
 			"posting_date": nowdate(),
 			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory"),
@@ -93,7 +91,6 @@ def get_order_taxes(qb_orders):
 	taxes = []
 	if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
 		if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
-			#for tax in qb_orders['TxnTaxDetail']['TaxLine']:
 			taxes.append({
 				"charge_type": _("Actual"),
 				"account_head": "Commission on Sales - ES",#get_tax_account_head(tax),
@@ -111,5 +108,4 @@ def get_order_taxes(qb_orders):
 		# 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
 		# 			})
 			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
-
 	return taxes
