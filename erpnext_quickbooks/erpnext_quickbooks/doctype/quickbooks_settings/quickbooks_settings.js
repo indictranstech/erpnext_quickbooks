@@ -9,12 +9,22 @@ frappe.ui.form.on('Quickbooks Settings', {
 	refresh: function(frm) {
 	var me = this;
 	var quickbooks_authentication_url = ""
-  	}
+	 }
 });
+
+cur_frm.fields_dict["taxes"].grid.get_field("tax_account").get_query = function(doc, dt, dn){
+	return {
+		"query": "erpnext.controllers.queries.tax_account_query",
+		"filters": {
+			"account_type": ["Tax", "Chargeable", "Expense Account"],
+			"company": frappe.defaults.get_default("Company")
+		}
+	}
+},
 
 cur_frm.cscript.connect_to_qb = function () {
 	var me = this;
-	if((cur_frm.doc.consumer_key != null) && (cur_frm.doc.consumer_secret != null) && (cur_frm.doc.consumer_key != "") && (cur_frm.doc.consumer_secret != "")){
+	if((cur_frm.doc.consumer_key != null) && (cur_frm.doc.consumer_secret != null) && (cur_frm.doc.consumer_key.trim() != "") && (cur_frm.doc.consumer_secret.trim() != "")){
 		return frappe.call({
 				method: "erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.quickbooks_authentication_popup",
 				args:{ 
@@ -46,7 +56,7 @@ cur_frm.cscript.sync_data_to_qb = function () {
 						msgprint(__('Sync Successfully all the data is Transferred'));
 					}
 					else{
-						msgprint(__('Failed to Sync'));
+						msgprint(__('Sync Successfully'));
 					}
 				}
 			});
@@ -60,4 +70,3 @@ pop_up_window = function(url,windowName) {
        if (window.focus){newwindow.focus()}
        return false;
        }
-

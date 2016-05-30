@@ -50,7 +50,6 @@ callback_url=""
 def First_callback(realmId, oauth_verifier):
 	login_via_oauth2(realmId, oauth_verifier)
 
-
 def login_via_oauth2(realmId, oauth_verifier):
 	""" Store necessary token's to Setup service """
 	global realm_id
@@ -110,26 +109,19 @@ def sync_quickbooks_data_erp():
         minorversion=4
     )
  
- 	customer_data = sync_customers(quickbooks_obj)
+	customer_data = sync_customers(quickbooks_obj)
 	supplier_data = sync_suppliers(quickbooks_obj)
 	Employee_data = create_Employee(quickbooks_obj)
 	Item_data = create_Item(quickbooks_obj)
 	sync_Account(quickbooks_obj)
 	invoice_data = sync_si_orders(quickbooks_obj)
- 	sync_pi_orders(quickbooks_obj)
-	sync_entry(quickbooks_obj)
+	sync_pi_orders(quickbooks_obj)
+
 	payment_invoice(quickbooks_obj)
+	bill_payment(quickbooks_obj)
+	sync_entry(quickbooks_obj)
 	
 	if customer_data and supplier_data and Employee_data and Item_data:
 		return "Success"
 	else:
 		return "failed to update"
-
-	# Sync_erp_customer(quickbooks_obj)
-
-	# sync_qb_journal_entry(payment1)
-	#sync_qb_journal_entry(payment1)
-	# sync_entries(journal_entry1)
-	#payment_invoice(quickbooks_obj)
-	# sync_orders(quickbooks_obj)
-	
