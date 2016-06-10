@@ -4,6 +4,8 @@ from frappe import _
 import frappe.defaults
 import requests.exceptions
 from .utils import make_quickbooks_log
+from erpnext_quickbooks.pyqb.quickbooks.objects.account import Account 
+
 
 """Code to fetch all the Account from Quickbooks And store it in ERPNEXT"""
 def sync_Account(quickbooks_obj):
@@ -26,7 +28,7 @@ def create_account(qb_account, quickbooks_account_list):
 	root_type = None
 	parent_account = None
 	Default_company = frappe.defaults.get_defaults().get("company")
-	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
+	Company_abbr = frappe.db.get_value("Company", {"name": Default_company}, "abbr")
 	
 	if qb_account.get('Classification') == "Asset":
 		parent_account = _("Accounts Receivable") + " - " + Company_abbr
@@ -60,3 +62,75 @@ def create_account(qb_account, quickbooks_account_list):
 				request_data=qb_account, exception=True)
 	
 	return quickbooks_account_list
+
+
+"""Sync ERPNext Account to QuickBooks"""
+
+def sync_erp_accounts():
+	"""Recive Response From Quickbooks and Update quickbooks_account_id in Account"""
+	response_from_quickbooks = sync_erp_accounts_to_quickbooks()
+	if response_from_quickbooks:
+		try:
+			for response_obj in response_from_quickbooks.successes:
+				if response_obj:
+					frappe.db.sql("""UPDATE tabAccount SET quickbooks_account_id = %s WHERE name ='%s'""" %(response_obj.Id, response_obj.Name))
+				else:
+					raise _("Does not get any response from quickbooks")	
+		except Exception, e:
+			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_accounts", message=frappe.get_traceback(),
+				request_data=response_obj, exception=True)
+
+def sync_erp_accounts_to_quickbooks():
+	Account_list = []
+	for erp_account in erp_account_data():
+		try:
+			if erp_account:
+				create_erp_account_to_quickbooks(erp_account, Account_list)
+			else:
+				raise _("Account does not exist in ERPNext")
+		except Exception, e:
+			if e.args[0] and e.args[0].startswith("402"):
+				raise e
+			else:
+				make_quickbooks_log(title=e.message, status="Error", method="sync_erp_accounts_to_quickbooks", message=frappe.get_traceback(),
+					request_data=erp_account, exception=True)
+	results = batch_create(Account_list)
+	return results
+
+def erp_account_data():
+	erp_account = frappe.db.sql("""select name, root_type, account_type, quickbooks_account_id from `tabAccount` where is_group =0 && quickbooks_account_id is NULL limit 0,1""" ,as_dict=1)
+	return erp_account
+
+def create_erp_account_to_quickbooks(erp_account, Account_list):
+	account_obj = Account()
+	account_obj.Name = erp_account.name
+	account_obj.FullyQualifiedName = erp_account.name
+	account_classification_and_account_type(account_obj, erp_account)
+	account_obj.save()
+	Account_list.append(account_obj)
+	return Account_list
+
+def account_classification_and_account_type(account_obj, erp_account):
+	if erp_account.root_type == "Asset":
+		account_obj.Classification = erp_account.root_type
+		account_obj.AccountType = "Other Current Asset"
+		account_obj.AccountSubType = "AllowanceForBadDebts"
+	elif erp_account.root_type =="Liability":
+		account_obj.Classification = erp_account.root_type
+		account_obj.AccountType = "Liability"
+		account_obj.AccountSubType = "OtherCurrentLiabilities"
+	elif erp_account.root_type =="Expense":
+		account_obj.Classification = erp_account.root_type
+		account_obj.AccountType ="Other Expense"
+		account_obj.AccountSubType ="Amortization"
+	elif erp_account.root_type == "Income":
+		account_obj.Classification = erp_account.root_type
+		account_obj.AccountType = "Income"
+		account_obj.AccountSubType = "SalesOfProductIncome"
+	elif erp_account.root_type == "Equity":
+		account_obj.Classification = erp_account.root_type
+		account_obj.AccountType = "Equity"
+		account_obj.AccountSubType ="RetainedEarnings"
+	else:
+		account_obj.Classification = None
+		account_obj.AccountType = "Cost of Goods Sold"
