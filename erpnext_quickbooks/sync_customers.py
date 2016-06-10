@@ -3,7 +3,8 @@ import frappe
 from frappe import _
 import requests.exceptions
 from .utils import make_quickbooks_log
-
+from pyqb.quickbooks.batch import batch_create, batch_delete
+from pyqb.quickbooks.objects.customer import Customer 
 
 def sync_customers(quickbooks_obj):
 	"""Fetch Customer data from QuickBooks"""
@@ -15,6 +16,7 @@ def sync_customers(quickbooks_obj):
 	
 def sync_qb_customers(get_qb_customer, quickbooks_customer_list):
 	for qb_customer in get_qb_customer:
+		# if not frappe.db.get_value("Customer", {"quickbooks_cust_id": [qb_customer.get('Id'), qb_customer.get('value')]}, "name"):
 		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": qb_customer.get('id')}, "name"):
 			create_customer(qb_customer, quickbooks_customer_list)
 
@@ -78,3 +80,51 @@ def get_address_title_and_type(customer_name):
 		address_title = "{0}".format(customer_name.strip())
 		
 	return address_title, address_type 
+
+
+"""	Sync Customer Records From ERPNext to QuickBooks """
+
+def sync_erp_customers():
+	"""Receive Response From Quickbooks and Update quickbooks_cust_id in Customer"""
+	response_from_quickbooks = sync_erp_customers_to_quickbooks()
+	if response_from_quickbooks:
+		try:
+			for response_obj in response_from_quickbooks.successes:
+				if response_obj:
+					frappe.db.sql("""UPDATE tabCustomer SET quickbooks_cust_id = %s WHERE customer_name ='%s'""" %(response_obj.Id, response_obj.DisplayName))
+				else:
+					raise _("Does not get any response from quickbooks")	
+		except Exception, e:
+			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_customers", message=frappe.get_traceback(),
+				request_data=response_obj, exception=True)
+
+def sync_erp_customers_to_quickbooks():
+	"""Sync ERPNext Customer to QuickBooks"""
+	Customer_list = []
+	for erp_cust in erp_customer_data():
+		try:
+			if erp_cust:
+				create_erp_customer_to_quickbooks(erp_cust, Customer_list)
+			else:
+				raise _("Customer does not exist in ERPNext")
+		except Exception, e:
+			if e.args[0] and e.args[0].startswith("402"):
+				raise e
+			else:
+				make_quickbooks_log(title=e.message, status="Error", method="sync_erp_customers_to_quickbooks", message=frappe.get_traceback(),
+					request_data=erp_cust, exception=True)
+	results = batch_create(Customer_list)
+	return results
+	
+
+def erp_customer_data():
+	erp_customer = frappe.db.sql("""select `customer_name` from `tabCustomer` WHERE  quickbooks_cust_id IS NULL""" ,as_dict=1)
+	return erp_customer
+
+def create_erp_customer_to_quickbooks(erp_cust, Customer_list):
+	customer_obj = Customer()
+	customer_obj.FullyQualifiedName = erp_cust.customer_name
+	customer_obj.DisplayName = erp_cust.customer_name
+	customer_obj.save()
+	Customer_list.append(customer_obj)
+	return Customer_list
