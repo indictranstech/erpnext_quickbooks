@@ -70,9 +70,9 @@ def get_order_items(order_items):
 	for qb_item in range(len(order_items) -1):
 		item_code = get_item_code(order_items[qb_item])
 		items.append({
-			"item_code": item_code,
-			"item_name": item_code,
-			"description":order_items[qb_item]['Description'] if order_items[qb_item].get('Description') else item_code,
+			"item_code": item_code if item_code else '',
+			"item_name": order_items[qb_item]['Description'] if order_items[qb_item].get('Description') else '',
+			"description":order_items[qb_item]['Description'] if order_items[qb_item].get('Description') else '',
 			"rate": order_items[qb_item].get('SalesItemLineDetail').get('UnitPrice'),
 			"qty": order_items[qb_item].get('SalesItemLineDetail').get('Qty'),
 			"stock_uom": _("Nos")			
@@ -82,19 +82,22 @@ def get_order_items(order_items):
 def get_item_code(qb_item):
 	#item_code = frappe.db.get_value("Item", {"quickbooks_variant_id": qb_item.get("variant_id")}, "item_code")
 	#if not item_code:
-	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": qb_item.get('SalesItemLineDetail').get('ItemRef').get('value')}, "item_code")
-
+	quickbooks_item_id = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else ''
+	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, "item_code")
 	return item_code
 
 
 def get_order_taxes(qb_orders):
 	taxes = []
+	Default_company = frappe.defaults.get_defaults().get("company")
+	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
+
 	if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
 		if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
 			taxes.append({
 				"charge_type": _("Actual"),
-				"account_head": "Commission on Sales - ES",#get_tax_account_head(tax),
-				"description": "Total Tax added from invoice",
+				"account_head": _("Commission on Sales") + " - " + Company_abbr, 
+				"description": _("Total Tax added from invoice"),
 				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
 			})
