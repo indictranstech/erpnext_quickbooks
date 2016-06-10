@@ -3,8 +3,8 @@ import frappe
 from frappe import _
 import requests.exceptions
 from .utils import make_quickbooks_log
-
-
+from pyqb.quickbooks.batch import batch_create, batch_delete
+from pyqb.quickbooks.objects.vendor import Vendor
 
 def sync_suppliers(quickbooks_obj):
 	""" Fetch Supplier data from QuickBooks"""
@@ -32,7 +32,6 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 		supplier.default_currency =qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else ''
 		supplier.insert()
 		
-
 		if supplier and qb_supplier.get('BillAddr'):
 			create_supplier_address(supplier, qb_supplier.get("BillAddr"))
 		frappe.db.commit()
@@ -44,8 +43,6 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 		else:
 			make_quickbooks_log(title=e.message, status="Error", method="create_Supplier", message=frappe.get_traceback(),
 				request_data=qb_supplier, exception=True)
-
-	print "qb supplier list ",quickbooks_supplier_list
 	return quickbooks_supplier_list
 
 def create_supplier_address(supplier, address):
@@ -80,15 +77,47 @@ def get_address_title_and_type(supplier_name):
 	return address_title, address_type 
 
 
+"""Sync Supplier From Erpnext to Quickbooks"""
+def sync_erp_suppliers():
+	"""Receive Response From Quickbooks and Update quickbooks_supp_id for Supplier"""
+	response_from_quickbooks = sync_erp_suppliers_to_quickbooks()
+	if response_from_quickbooks:
+		try:
+			for response_obj in response_from_quickbooks.successes:
+				if response_obj:
+					frappe.db.sql("""UPDATE tabSupplier SET quickbooks_supp_id = %s WHERE employee_name ='%s'""" %(response_obj.Id, response_obj.DisplayName))
+				else:
+					raise _("Does not get any response from quickbooks")	
+		except Exception, e:
+			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_suppliers", message=frappe.get_traceback(),
+				request_data=response_obj, exception=True)
 
-
-
-
-
-
+def sync_erp_suppliers_to_quickbooks():
+	Supplier_list = []
+	for erp_supplier in erp_supplier_data():
+		try:
+			if erp_supplier:
+				create_erp_suppliers_to_quickbooks(erp_supplier, Supplier_list)
+			else:
+				raise _("Supplier does not exist in ERPNext")
+		except Exception, e:
+			if e.args[0] and e.args[0].startswith("402"):
+				raise e
+			else:
+				make_quickbooks_log(title=e.message, status="Error", method="sync_erp_suppliers", message=frappe.get_traceback(),
+					request_data=erp_supplier, exception=True)
+	results = batch_create(Supplier_list)
+	return results
 	
+def erp_supplier_data():
+	erp_supplier = frappe.db.sql("""select supplier_name from `tabSupplier` WHERE  quickbooks_supp_id IS NULL""" ,as_dict=1)
+	return erp_supplier
 
-
-
-
+def create_erp_suppliers_to_quickbooks(erp_supplier, Supplier_list):
+	supplier_obj = Vendor()
+	supplier_obj.CompanyName = erp_supplier.supplier_name
+	supplier_obj.DisplayName = erp_supplier.supplier_name
+	supplier_obj.save()
+	Supplier_list.append(supplier_obj)
+	return Supplier_list
 

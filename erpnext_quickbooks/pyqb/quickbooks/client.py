@@ -124,7 +124,6 @@ class QuickBooks(object):
            params={'oauth_callback': self.callback_url})
 
         oauth_resp = dict(parse_qsl(response.text))
-        print "---------------------",oauth_resp
         self.request_token = oauth_resp['oauth_token']
         self.request_token_secret = oauth_resp['oauth_token_secret']
 
@@ -157,16 +156,44 @@ class QuickBooks(object):
 
         return session
 
+
     def make_request(self, request_type, url, request_body=None, content_type='application/json'):
 
         params = {}
-        # print "data",request_type,url,request_body,content_type
-        # print type (request_body)
+
+        if self.minorversion:
+            params['minorversion'] = self.minorversion
+
+        if not request_body:
+            request_body = {}
+
+        if self.session is None:
+            self.create_session()
+
+        headers = {
+            'Content-Type': content_type,
+            'Accept': 'application/json'
+        }
+
+        req = self.session.request(request_type, url, True, self.company_id, headers=headers, params=params, data=request_body)
+
+        try:
+            result = req.json()
+        except:
+            raise QuickbooksException("Error reading json response: {0}".format(req.text), 10000)
+
+        if req.status_code is not httplib.OK or "Fault" in result:
+            self.handle_exceptions(result["Fault"])
+        else:
+            return result
+
+    def make_request_query(self, request_type, url, request_body=None, content_type='application/json'):
+
+        params = {}
         if self.minorversion:
             params['minorversion'] = self.minorversion
         params['query'] =  request_body
 
-        print "params----------",type (params), params ,type (params['query'])
         if not request_body:
             request_body = {}
 
@@ -181,7 +208,6 @@ class QuickBooks(object):
         req = self.session.request(request_type, url, True, str(self.company_id), headers=headers, params=params)
         # req = self.session.request(request_type, url, True, self.company_id, headers=headers, params=params, data=request_body)
         
-
         try:
             result = req.json()
         except:
@@ -194,7 +220,7 @@ class QuickBooks(object):
 
     def get_single_object(self, qbbo, pk):
         url = self.api_url + "/company/{0}/{1}/{2}/".format(self.company_id, qbbo.lower(), pk)
-        result = self.make_request("GET", url, {})
+        result = self.make_request_query("GET", url, {})
 
         return result
 
@@ -222,13 +248,12 @@ class QuickBooks(object):
 
         url = self.api_url + "/company/{0}/{1}".format(self.company_id, qbbo.lower())
         results = self.make_request("POST", url, request_body)
-
+        print results
         return results
 
     def query(self, select):
-        print "qqqqqqqqqqqqqqqq"
         url = self.api_url + "/company/{0}/query".format(self.company_id)
-        result = self.make_request("POST", url, select, content_type='text/plain')
+        result = self.make_request_query("POST", url, select, content_type='text/plain')
         return result
 
     def isvalid_object_name(self, object_name):
@@ -246,7 +271,6 @@ class QuickBooks(object):
     def batch_operation(self, request_body):
         url = self.api_url + "/company/{0}/batch".format(self.company_id)
         results = self.make_request("POST", url, request_body)
-
         return results
 
     def download_pdf(self, qbbo, item_id):
