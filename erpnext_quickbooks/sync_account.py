@@ -4,7 +4,8 @@ from frappe import _
 import frappe.defaults
 import requests.exceptions
 from .utils import make_quickbooks_log
-from erpnext_quickbooks.pyqb.quickbooks.objects.account import Account 
+from pyqb.quickbooks.batch import batch_create, batch_delete
+from pyqb.quickbooks.objects.account import Account 
 
 
 """Code to fetch all the Account from Quickbooks And store it in ERPNEXT"""
