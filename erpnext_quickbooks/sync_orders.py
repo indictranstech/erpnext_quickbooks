@@ -112,3 +112,83 @@ def get_order_taxes(qb_orders):
 		# 			})
 			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
 	return taxes
+
+
+
+from pyqb.quickbooks.objects.invoice import Invoice
+from pyqb.quickbooks.objects.detailline import SaleItemLine, SalesItemLineDetail
+
+
+"""	Sync Invoices Records From ERPNext to QuickBooks """
+def sync_erp_sales_invoices():
+	"""Receive Response From Quickbooks and Update quickbooks_invoce_id in Invoices"""
+	response_from_quickbooks = sync_erp_sales_invoices_to_quickbooks()
+	if response_from_quickbooks:
+		try:
+			for response_obj in response_from_quickbooks.successes:
+				if response_obj:
+					frappe.db.sql("""UPDATE `tabSales Invoice` SET quickbooks_invoce_id = %s WHERE name ='%s'""" %(response_obj.Id, response_obj.DocNumber))
+				else:
+					raise _("Does not get any response from quickbooks")	
+		except Exception, e:
+			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_sales_invoices", message=frappe.get_traceback(),
+				request_data=response_obj, exception=True)
+
+def sync_erp_sales_invoices_to_quickbooks():
+	"""Sync ERPNext Invoice to QuickBooks"""
+	Sales_invoice_list = []
+	for erp_sales_invoice in erp_sales_invoice_data():
+		try:
+			if erp_sales_invoice:
+				create_erp_sales_invoice_to_quickbooks(erp_sales_invoice, Sales_invoice_list)
+			else:
+				raise _("Sales invoice does not exist in ERPNext")
+		except Exception, e:
+			if e.args[0] and e.args[0].startswith("402"):
+				raise e
+			else:
+				make_quickbooks_log(title=e.message, status="Error", method="sync_erp_sales_invoices_to_quickbooks", message=frappe.get_traceback(),
+					request_data=erp_sales_invoice, exception=True)
+	results = batch_create(Sales_invoice_list)
+	return results
+
+def erp_sales_invoice_data():
+	"""ERPNext Invoices Record"""
+	erp_sales_invoice = frappe.db.sql("""select `name` ,`customer_name` from  `tabSales Invoice` where `quickbooks_invoce_id` is NULL and is_pos is FALSE and docstatus = 1""" ,as_dict=1)
+	return erp_sales_invoice
+
+def erp_sales_invoice_item_data(invoice_name):
+	"""ERPNext Invoice Items Record of Particular Invoice"""
+	erp_sales_invoice_item = frappe.db.sql("""SELECT `idx`, `description`, `rate`, `item_code`, `qty` from `tabSales Invoice Item` where parent = '%s'""" %(invoice_name), as_dict=1)
+	return erp_sales_invoice_item
+
+def create_erp_sales_invoice_to_quickbooks(erp_sales_invoice, Sales_invoice_list):
+	sales_invoice_obj = Invoice()
+	sales_invoice_obj.DocNumber = erp_sales_invoice.name
+	sales_invoice_item(sales_invoice_obj, erp_sales_invoice)
+	customer_ref(sales_invoice_obj, erp_sales_invoice)
+	sales_invoice_obj.GlobalTaxCalculation = "NotApplicable"
+	sales_invoice_obj.save()
+	Sales_invoice_list.append(sales_invoice_obj)
+	return Sales_invoice_list		
+
+def customer_ref(sales_invoice_obj, erp_sales_invoice):
+	quickbooks_cust_id = frappe.db.get_value("Customer", {"name": erp_sales_invoice.get('customer_name')}, "quickbooks_cust_id")
+	sales_invoice_obj.CustomerRef = {"value": quickbooks_cust_id}
+
+def sales_invoice_item(sales_invoice_obj, erp_sales_invoice):
+	invoice_name = erp_sales_invoice.name
+	for invoice_item in erp_sales_invoice_item_data(invoice_name):
+		line = SaleItemLine()
+		line.LineNum = invoice_item.idx
+		line.Description = invoice_item.description
+		line.Amount = flt(invoice_item.rate) * flt(invoice_item.qty)
+		line.SalesItemLineDetail = SalesItemLineDetail()
+		line.SalesItemLineDetail.ItemRef = item_ref(invoice_item) 
+		line.SalesItemLineDetail.Qty = invoice_item.qty
+		line.SalesItemLineDetail.UnitPrice =invoice_item.rate
+		sales_invoice_obj.Line.append(line)
+		
+def item_ref(invoice_item):
+	quickbooks_item_id = frappe.db.get_value("Item", {"name": invoice_item.get('item_code')}, "quickbooks_item_id")
+	return {"value": quickbooks_item_id, "name": invoice_item.get('item_code')}
