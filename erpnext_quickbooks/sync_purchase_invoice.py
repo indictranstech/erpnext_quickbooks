@@ -8,6 +8,7 @@ import requests.exceptions
 from .utils import make_quickbooks_log
 
 
+
 """Sync all the Purchase Invoice from Quickbooks to ERPNEXT"""
 
 def sync_pi_orders(quickbooks_obj):
@@ -112,7 +113,7 @@ def get_order_taxes(qb_orders):
 			taxes.append({
 				"category" : _("Total"),
 				"charge_type": _("Actual"),
-				"account_head": _("Commission on Sales") + " - " + Company_abbr, #get_tax_account_head(tax),
+				"account_head": _("Commission on Sales") + " - " + Company_abbr,
 				"description": "Total Tax added from invoice",
 				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
@@ -127,5 +128,93 @@ def get_order_taxes(qb_orders):
 		# 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
 		# 			})
 			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
-
 	return taxes
+
+
+from pyqb.quickbooks.objects.base import Ref
+from pyqb.quickbooks.objects.bill import Bill, BillLine, AccountBasedExpenseLineDetail, ItemBasedExpenseLineDetail
+
+"""	Sync Purchase Invoices Records From ERPNext to QuickBooks """
+def sync_erp_purchase_invoices():
+	"""Receive Response From Quickbooks and Update quickbooks_purchase_invoice_id in Purchase Invoices"""
+	response_from_quickbooks = sync_erp_purchase_invoices_to_quickbooks()
+	if response_from_quickbooks:
+		try:
+			for response_obj in response_from_quickbooks.successes:
+				if response_obj:
+					frappe.db.sql("""UPDATE `tabPurchase Invoice` SET quickbooks_purchase_invoice_id = %s WHERE name ='%s'""" %(response_obj.Id, response_obj.DocNumber))
+				else:
+					raise _("Does not get any response from quickbooks")	
+		except Exception, e:
+			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_purchase_invoices", message=frappe.get_traceback(),
+				request_data=response_obj, exception=True)
+
+def sync_erp_purchase_invoices_to_quickbooks():
+	"""Sync ERPNext Purchase Invoice to QuickBooks"""
+	Purchase_invoice_list = []
+	for erp_purchase_invoice in erp_purchase_invoice_data():
+		try:
+			if erp_purchase_invoice: 
+				create_erp_purchase_invoice_to_quickbooks(erp_purchase_invoice, Purchase_invoice_list)
+			else:
+				raise _("Purchase invoice does not exist in ERPNext")
+		except Exception, e:
+			if e.args[0] and e.args[0].startswith("402"):
+				raise e
+			else:
+				make_quickbooks_log(title=e.message, status="Error", method="sync_erp_purchase_invoices_to_quickbooks", message=frappe.get_traceback(),
+					request_data=erp_purchase_invoice, exception=True)
+	results = batch_create(Purchase_invoice_list)
+	return results
+
+
+
+def erp_purchase_invoice_data():
+	"""ERPNext Invoices Record"""
+	erp_purchase_invoice = frappe.db.sql("""SELECT `name`,`supplier_name`,DATE_FORMAT(due_date,'%d-%m-%Y') as due_date, DATE_FORMAT(posting_date,'%d-%m-%Y') as posting_date from  `tabPurchase Invoice` where `quickbooks_purchase_invoice_id` is NULL and docstatus = 1""" ,as_dict=1)
+	return erp_purchase_invoice
+
+def erp_purchase_invoice_item_data(purchase_invoice_name):
+	"""ERPNext Invoice Items Record of Particular Invoice"""
+	erp_purchase_invoice_item = frappe.db.sql("""SELECT `idx`, `description`, `rate`, `item_code`, `qty` from `tabPurchase Invoice Item` where parent = '%s'""" %(purchase_invoice_name), as_dict=1)
+	return erp_purchase_invoice_item
+
+def create_erp_purchase_invoice_to_quickbooks(erp_purchase_invoice, Purchase_invoice_list):
+	purchase_invoice_obj = Bill()
+	purchase_invoice_obj.DocNumber = erp_purchase_invoice.name
+	purchase_invoice_obj.DueDate = erp_purchase_invoice.due_date
+	purchase_invoice_obj.TxnDate =  erp_purchase_invoice.posting_date
+	Vendor_ref(purchase_invoice_obj, erp_purchase_invoice)
+	purchase_invoice_item(purchase_invoice_obj, erp_purchase_invoice)
+  	Vendor_ref(purchase_invoice_obj, erp_purchase_invoice)
+	purchase_invoice_obj.save()
+	Purchase_invoice_list.append(purchase_invoice_obj)
+	return Purchase_invoice_list
+
+
+def Vendor_ref(purchase_invoice_obj, erp_purchase_invoice):
+	vendor_reference = Ref()
+	vendor_reference.value = frappe.db.get_value("Supplier", {"name": erp_purchase_invoice.get('supplier_name')}, "quickbooks_supp_id")
+	purchase_invoice_obj.VendorRef = vendor_reference
+
+def purchase_invoice_item(purchase_invoice_obj, erp_purchase_invoice):
+	purchase_invoice_name = erp_purchase_invoice.name
+	for purchase_invoice_item in erp_purchase_invoice_item_data(purchase_invoice_name):
+		line = BillLine()
+		line.LineNum = purchase_invoice_item.idx
+		line.Amount = flt(purchase_invoice_item.rate) * flt(purchase_invoice_item.qty)
+		line.Description = purchase_invoice_item.description
+		line.DetailType = "ItemBasedExpenseLineDetail"
+		line.ItemBasedExpenseLineDetail = ItemBasedExpenseLineDetail()
+		line.ItemBasedExpenseLineDetail.ItemRef = purchase_item_ref(purchase_invoice_item)
+		line.ItemBasedExpenseLineDetail.BillableStatus = "NotBillable"
+		line.ItemBasedExpenseLineDetail.Qty = purchase_invoice_item.qty
+		line.ItemBasedExpenseLineDetail.UnitPrice = purchase_invoice_item.rate
+		purchase_invoice_obj.Line.append(line)
+
+
+def purchase_item_ref(purchase_invoice_item):
+	item_reference = Ref()
+	item_reference.name = purchase_invoice_item.get('item_code')
+	item_reference.value = frappe.db.get_value("Item", {"name": purchase_invoice_item.get('item_code')}, "quickbooks_item_id")
+	return item_reference
