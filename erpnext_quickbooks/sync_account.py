@@ -19,7 +19,7 @@ def sync_Account(quickbooks_obj):
 	
 def sync_qb_accounts(get_qb_account, quickbooks_account_list):
 	for qb_account in get_qb_account:
-		if not frappe.db.get_value("Account", {"quickbooks_account_id": qb_account.get('id')}, "name"):
+		if not frappe.db.get_value("Account", {"quickbooks_account_id": qb_account.get('Id')}, "name"):
 			create_account(qb_account, quickbooks_account_list)
 
 def create_account(qb_account, quickbooks_account_list):
@@ -99,7 +99,7 @@ def sync_erp_accounts_to_quickbooks():
 	return results
 
 def erp_account_data():
-	erp_account = frappe.db.sql("""select name, root_type, account_type, quickbooks_account_id from `tabAccount` where is_group =0 && quickbooks_account_id is NULL limit 0,1""" ,as_dict=1)
+	erp_account = frappe.db.sql("""select name, root_type, account_type, quickbooks_account_id from `tabAccount` where is_group =0 && quickbooks_account_id is NULL""" ,as_dict=1)
 	return erp_account
 
 def create_erp_account_to_quickbooks(erp_account, Account_list):

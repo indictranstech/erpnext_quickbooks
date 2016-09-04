@@ -7,6 +7,11 @@ import frappe
 import json
 from .exceptions import QuickbooksSetupError
 
+def disable_quickbooks_sync_on_exception():
+	frappe.db.rollback()
+	frappe.db.set_value("Quickbooks Settings", None, "enable_quickbooks_online", 0)
+	frappe.db.commit()
+
 	
 def make_quickbooks_log(title="Sync Log", status="Queued", method="sync_quickbooks", message=None, exception=False, 
 name=None, request_data={}):	

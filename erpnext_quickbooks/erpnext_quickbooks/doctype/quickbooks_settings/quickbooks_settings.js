@@ -44,29 +44,23 @@ cur_frm.cscript.connect_to_qb = function () {
 	}
 }, 
  
-cur_frm.cscript.sync_data_to_qb = function () {
+cur_frm.cscript.sync_data_to_qb = function (frm) {
 	var me = this;
 	// if(me.quickbooks_authentication_url){
+	if(!cur_frm.doc.__islocal && cur_frm.doc.enable_quickbooks_online=== 1){
+		cur_frm.toggle_reqd("selling_price_list", true);
+		cur_frm.toggle_reqd("buying_price_list", true);
+		cur_frm.toggle_reqd("warehouse", true);
+
 		return frappe.call({
-				method: "erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.sync_quickbooks_data_erp",
-				freeze: true,
-	 			freeze_message:"Please wait.. Syncing data to Quickbooks................",
-				callback: function(r) {
-					if(r.message == "Success"){
-						msgprint(__('Sync Successfully all the data is Transferred'));
-					}
-					else{
-						msgprint(__('Sync Successfully'));
-					}
-				}
+				method: "erpnext_quickbooks.api.sync_quickbooks_resources",
 			});
-	// }else{
-	// 	msgprint(__("Please Connect to Quickbooks Sandbox Account First Before Syncing"));
-	// }
+	}
+	
 },
 
 pop_up_window = function(url,windowName) {
        newwindow=window.open(url,windowName,'height=400,width=600 ,top= 200, left=400');
        if (window.focus){newwindow.focus()}
        return false;
-       }
+ }

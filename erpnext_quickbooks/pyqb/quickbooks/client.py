@@ -163,6 +163,7 @@ class QuickBooks(object):
 
         if self.minorversion:
             params['minorversion'] = self.minorversion
+        print "params",type (params), params 
 
         if not request_body:
             request_body = {}
@@ -194,6 +195,7 @@ class QuickBooks(object):
             params['minorversion'] = self.minorversion
         params['query'] =  request_body
 
+        print "params",type (params), params ,type (params['query'])
         if not request_body:
             request_body = {}
 

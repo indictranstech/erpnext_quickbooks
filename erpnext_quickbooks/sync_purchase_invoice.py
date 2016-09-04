@@ -8,7 +8,6 @@ import requests.exceptions
 from .utils import make_quickbooks_log
 
 
-
 """Sync all the Purchase Invoice from Quickbooks to ERPNEXT"""
 
 def sync_pi_orders(quickbooks_obj):
@@ -44,9 +43,10 @@ def valid_supplier_and_product(qb_orders):
 
 def create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, company=None):
 	""" Store Sales Invoice in ERPNEXT """
-	create_purchase_invoice(qb_orders, quickbooks_purchase_invoice_list, company=None)
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, company=None)
 
-def create_purchase_invoice(qb_orders, quickbooks_purchase_invoice_list, company=None):
+def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, company=None):
 	pi = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": qb_orders.get("Id")}, "name") 
 	if not pi:
 		pi = frappe.get_doc({
@@ -55,7 +55,7 @@ def create_purchase_invoice(qb_orders, quickbooks_purchase_invoice_list, company
 			"naming_series": "PI-Quickbooks-",
 			"supplier": frappe.db.get_value("Supplier",{"quickbooks_supp_id":qb_orders['VendorRef'].get('value')},"name"),
 			"posting_date": nowdate(),
-			"buying_price_list": "Standard Buying",
+			"buying_price_list": quickbooks_settings.buying_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
 			"items": get_order_items(qb_orders['Line']),
@@ -130,7 +130,7 @@ def get_order_taxes(qb_orders):
 			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
 	return taxes
 
-
+from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.base import Ref
 from pyqb.quickbooks.objects.bill import Bill, BillLine, AccountBasedExpenseLineDetail, ItemBasedExpenseLineDetail
 
@@ -166,8 +166,6 @@ def sync_erp_purchase_invoices_to_quickbooks():
 					request_data=erp_purchase_invoice, exception=True)
 	results = batch_create(Purchase_invoice_list)
 	return results
-
-
 
 def erp_purchase_invoice_data():
 	"""ERPNext Invoices Record"""

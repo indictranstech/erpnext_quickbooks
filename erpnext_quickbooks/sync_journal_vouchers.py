@@ -3,6 +3,7 @@ import frappe
 from frappe import _
 import requests.exceptions
 from .utils import make_quickbooks_log
+import datetime
 
 
 def sync_entry(quickbooks_obj):
@@ -12,6 +13,7 @@ def sync_entry(quickbooks_obj):
 	get_qb_Entry =  qb_Entry['QueryResponse']['JournalEntry']
 	sync_entries(get_qb_Entry)
 
+
 # def sync_entries(journal_entry1):
 # 	for qb_journal_entry in journal_entry1:
 # 		create_journal_entry(qb_journal_entry)
@@ -19,7 +21,6 @@ def sync_entry(quickbooks_obj):
 def sync_entries(get_qb_Entry):
 	for qb_journal_entry in get_qb_Entry:
 		create_journal_entry(qb_journal_entry)
-
 
 def create_journal_entry(qb_journal_entry, quickbooks_journal_entry_list=[]):
 	""" store JournalEntry data in ERPNEXT """ 
@@ -54,17 +55,27 @@ def create_journal_entry(qb_journal_entry, quickbooks_journal_entry_list=[]):
 	
 	return quickbooks_journal_entry_list
 
-
 def get_journal_entry_account(journal, qb_journal_entry):
-	journal.set("accounts", [])
-	for row in qb_journal_entry['Line']:
-		account = journal.append("accounts")
+	def append_row(row, debit_in_account_currency, credit_in_account_currency):
+		account = journal.append("accounts", {})
 		account.account = get_Account(row)
 		account.party_type = get_party_type(row)
 		account.party = get_party(row)
-		account.debit_in_account_currency = get_debit_in_account_currency(row)
-		account.credit_in_account_currency = get_credit_in_account_currency(row)
-		
+		account.debit_in_account_currency = debit_in_account_currency
+		account.credit_in_account_currency = credit_in_account_currency
+
+	journal.set("accounts", [])
+	for row in qb_journal_entry['Line']:
+		debit_in_account_currency = get_debit_in_account_currency(row)
+		credit_in_account_currency = get_credit_in_account_currency(row)
+		append_row(row, debit_in_account_currency, credit_in_account_currency)
+		TaxAmount =row['JournalEntryLineDetail'].get('TaxAmount')
+		if TaxAmount:
+			debit_in_account_currency = abs(TaxAmount) if row['JournalEntryLineDetail']['PostingType'] == "Debit" else ''
+			credit_in_account_currency = abs(TaxAmount) if row['JournalEntryLineDetail']['PostingType'] == "Credit" else ''
+			append_row(row, debit_in_account_currency, credit_in_account_currency)
+
+
 def get_Account(row):
 	quickbooks_account_reference = row.get('JournalEntryLineDetail')['AccountRef']['value']
 	return frappe.db.get_value("Account", {"quickbooks_account_id": quickbooks_account_reference}, "name")

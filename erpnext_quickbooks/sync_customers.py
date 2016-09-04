@@ -17,7 +17,7 @@ def sync_customers(quickbooks_obj):
 def sync_qb_customers(get_qb_customer, quickbooks_customer_list):
 	for qb_customer in get_qb_customer:
 		# if not frappe.db.get_value("Customer", {"quickbooks_cust_id": [qb_customer.get('Id'), qb_customer.get('value')]}, "name"):
-		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": qb_customer.get('id')}, "name"):
+		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": qb_customer.get('Id')}, "name"):
 			create_customer(qb_customer, quickbooks_customer_list)
 
 

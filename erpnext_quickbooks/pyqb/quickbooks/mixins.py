@@ -1,4 +1,4 @@
-import simplejson as json
+import json
 from .utils import build_where_clause, build_choose_clause
 from .client import QuickBooks
 from .exceptions import QuickbooksException

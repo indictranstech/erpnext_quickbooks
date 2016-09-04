@@ -4,6 +4,7 @@ from frappe import _
 from frappe.utils import flt, nowdate
 import requests.exceptions
 from .utils import make_quickbooks_log
+from pyqb.quickbooks.batch import batch_create, batch_delete
 
 """Sync all the Sales Invoice from Quickbooks to ERPNEXT"""
 def sync_si_orders(quickbooks_obj): 
@@ -40,9 +41,10 @@ def valid_customer_and_product(qb_orders):
 
 def create_order(qb_orders, quickbooks_invoice_list, company=None):
 	""" Store Sales Invoice in ERPNEXT """
-	create_sales_invoice(qb_orders, quickbooks_invoice_list, company=None)
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, company=None)
 
-def create_sales_invoice(qb_orders, quickbooks_invoice_list, company=None):
+def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, company=None):
 	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": qb_orders.get("Id")}, "name") 
 	if not si:
 		si = frappe.get_doc({
@@ -52,7 +54,7 @@ def create_sales_invoice(qb_orders, quickbooks_invoice_list, company=None):
 			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
 			"posting_date": nowdate(),
 			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory"),
-			"selling_price_list": "Standard Selling",
+			"selling_price_list": quickbooks_settings.selling_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
 			"items": get_order_items(qb_orders['Line']),
@@ -92,15 +94,16 @@ def get_order_taxes(qb_orders):
 	Default_company = frappe.defaults.get_defaults().get("company")
 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
 
-	if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
-		if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
-			taxes.append({
-				"charge_type": _("Actual"),
-				"account_head": _("Commission on Sales") + " - " + Company_abbr, 
-				"description": _("Total Tax added from invoice"),
-				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
-				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
-			})
+	# if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
+	# 	if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
+	# 		taxes.append({
+	# 			"charge_type": _("Actual"),
+	# 			"account_head": _("Commission on Sales") + " - " + Company_abbr, 
+	# 			"description": _("Total Tax added from invoice"),
+	# 			"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
+	# 			#"included_in_print_rate": set_included_in_print_rate(shopify_order)
+	# 		})
+			
 		# else:
 		# 	for tax in qb_orders['TxnTaxDetail']['TaxLine']:
 		# 			taxes.append({
@@ -114,7 +117,7 @@ def get_order_taxes(qb_orders):
 	return taxes
 
 
-
+from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.invoice import Invoice
 from pyqb.quickbooks.objects.detailline import SaleItemLine, SalesItemLineDetail
 
