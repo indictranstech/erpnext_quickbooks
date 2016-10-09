@@ -52,12 +52,12 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 			"quickbooks_invoce_id" : qb_orders.get("Id"),
 			"naming_series": "SI-Quickbooks-",
 			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
-			"posting_date": nowdate(),
+			"posting_date": qb_orders.get('TxnDate'),
 			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory"),
 			"selling_price_list": quickbooks_settings.selling_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
-			"items": get_order_items(qb_orders['Line']),
+			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
 			"taxes": get_order_taxes(qb_orders)
 		})
 		si.flags.ignore_mandatory = True
@@ -67,18 +67,20 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 		frappe.db.commit()	
 	return quickbooks_invoice_list
 
-def get_order_items(order_items):
+def get_order_items(order_items, quickbooks_settings):
  	items = []
-	for qb_item in range(len(order_items) -1):
-		item_code = get_item_code(order_items[qb_item])
-		items.append({
-			"item_code": item_code if item_code else '',
-			"item_name": order_items[qb_item]['Description'] if order_items[qb_item].get('Description') else '',
-			"description":order_items[qb_item]['Description'] if order_items[qb_item].get('Description') else '',
-			"rate": order_items[qb_item].get('SalesItemLineDetail').get('UnitPrice'),
-			"qty": order_items[qb_item].get('SalesItemLineDetail').get('Qty'),
-			"stock_uom": _("Nos")			
-		})
+	for qb_item in order_items:
+		if qb_item.get('SalesItemLineDetail'):
+			item_code = get_item_code(qb_item)
+			items.append({
+				"item_code": item_code if item_code else '',
+				"item_name": qb_item.get('Description') if qb_item.get('Description') else '',
+				"description": qb_item.get('Description') if qb_item.get('Description') else '',
+				"rate": qb_item.get('SalesItemLineDetail').get('UnitPrice'),
+				"qty": qb_item.get('SalesItemLineDetail').get('Qty'),
+				"income_account": quickbooks_settings.cash_bank_account,
+				"stock_uom": _("Nos")			
+			})
 	return items
 
 def get_item_code(qb_item):
@@ -94,15 +96,15 @@ def get_order_taxes(qb_orders):
 	Default_company = frappe.defaults.get_defaults().get("company")
 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
 
-	# if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
-	# 	if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
-	# 		taxes.append({
-	# 			"charge_type": _("Actual"),
-	# 			"account_head": _("Commission on Sales") + " - " + Company_abbr, 
-	# 			"description": _("Total Tax added from invoice"),
-	# 			"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
-	# 			#"included_in_print_rate": set_included_in_print_rate(shopify_order)
-	# 		})
+	if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
+		if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
+			taxes.append({
+				"charge_type": _("Actual"),
+				"account_head": get_tax_account_head(),
+				"description": _("Total Tax added from invoice"),
+				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
+				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
+			})
 			
 		# else:
 		# 	for tax in qb_orders['TxnTaxDetail']['TaxLine']:
@@ -115,6 +117,19 @@ def get_order_taxes(qb_orders):
 		# 			})
 			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
 	return taxes
+
+
+
+def get_tax_account_head():
+	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \
+		{"parent": "Quickbooks Settings"}, "tax_account")
+
+	if not tax_account:
+		frappe.throw("Tax Account not specified for Shopify Tax ")
+
+	return tax_account
+
+
 
 
 from pyqb.quickbooks.batch import batch_create, batch_delete

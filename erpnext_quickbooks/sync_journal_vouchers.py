@@ -13,11 +13,6 @@ def sync_entry(quickbooks_obj):
 	get_qb_Entry =  qb_Entry['QueryResponse']['JournalEntry']
 	sync_entries(get_qb_Entry)
 
-
-# def sync_entries(journal_entry1):
-# 	for qb_journal_entry in journal_entry1:
-# 		create_journal_entry(qb_journal_entry)
-
 def sync_entries(get_qb_Entry):
 	for qb_journal_entry in get_qb_Entry:
 		create_journal_entry(qb_journal_entry)

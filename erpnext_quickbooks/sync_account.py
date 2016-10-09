@@ -31,20 +31,54 @@ def create_account(qb_account, quickbooks_account_list):
 	Default_company = frappe.defaults.get_defaults().get("company")
 	Company_abbr = frappe.db.get_value("Company", {"name": Default_company}, "abbr")
 	
-	if qb_account.get('Classification') == "Asset":
+	
+	if qb_account.get('AccountType') == "Fixed Asset":
+		parent_account = _("Fixed Assets") + " - " + Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Other Current Asset":
+		parent_account = _("Current Assets") + " - " + Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Bank":
+		parent_account = _("Bank Accounts") + " - " + Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Other Asset":
+		parent_account = _("Loans and Advances (Assets)") + " - " + Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Accounts Receivable":
 		parent_account = _("Accounts Receivable") + " - " + Company_abbr
-		root_type = "Asset"
-	elif qb_account.get('Classification') == "Liability":
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Accounts Payable":
 		parent_account = _("Accounts Payable") + " - " + Company_abbr
-		root_type = "Liability"
-	else:
+		root_type = _("Liability")
+	elif qb_account.get('AccountType') == 'Other Current Liability':
+		parent_account = _("Current Liabilities") + " - " + Company_abbr
+		root_type = _("Liability")
+	elif qb_account.get('AccountType') == 'Long Term Liability':
+		parent_account = _("Loans (Liabilities)") + " - " + Company_abbr
+		root_type = _("Liability")
+	elif qb_account.get("AccountType") == "Equity":
+		parent_account = _("Equity") + " - " + Company_abbr
+		root_type = _("Equity")
+	elif qb_account.get('AccountType') == 'Income':
+		parent_account = _("Direct Income") + " - " + Company_abbr
+		root_type = _("Income")
+	elif qb_account.get('AccountType') == 'Other Income':
+		parent_account = _("Indirect Income") + " - " + Company_abbr
+		root_type = _("Income")
+	elif qb_account.get('AccountType') == 'Expense':
 		parent_account = _("Direct Expenses") + " - " + Company_abbr
-		root_type = "Expense"
-		
+		root_type = _("Expense")
+	elif qb_account.get('AccountType') == 'Other Expense':
+		parent_account = _("Indirect Expenses") + " - " + Company_abbr
+		root_type = _("Expense")
+	elif qb_account.get('AccountType') == 'Cost of Goods Sold':
+		parent_account = _("Indirect Expenses") + " - " + Company_abbr
+		root_type = _("Expense")
+
 	try:	
 		account = frappe.new_doc("Account")
 		account.quickbooks_account_id = str(qb_account.get('Id'))
-		account.account_name = str(qb_account.get('Name'))
+		account.account_name = str(qb_account.get('Name')) + " - " + "qb"
 		account.is_group = False
 		account.parent_account = parent_account
 		account.root_type = root_type
