@@ -26,6 +26,8 @@ class QuickbooksSettings(Document):
 @frappe.whitelist(allow_guest=True)
 def First_callback(realmId, oauth_verifier):
 	login_via_oauth2(realmId, oauth_verifier)
+	frappe.local.response["type"] = "redirect"
+	frappe.local.response["location"] = "/desk#Form/Quickbooks Settings"
 
 def login_via_oauth2(realmId, oauth_verifier):
 	""" Store necessary token's to Setup service """

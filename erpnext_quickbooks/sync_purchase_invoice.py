@@ -54,21 +54,21 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 			"quickbooks_purchase_invoice_id" : qb_orders.get("Id"),
 			"naming_series": "PI-Quickbooks-",
 			"supplier": frappe.db.get_value("Supplier",{"quickbooks_supp_id":qb_orders['VendorRef'].get('value')},"name"),
-			"posting_date": nowdate(),
+			"posting_date": qb_orders.get('TxnDate'),
 			"buying_price_list": quickbooks_settings.buying_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
-			"items": get_order_items(qb_orders['Line']),
+			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
 			"taxes": get_order_taxes(qb_orders)
 		})
 		pi.flags.ignore_mandatory = True
 		pi.save(ignore_permissions=True)
 		pi.submit()
-		quickbooks_purchase_invoice_list.append(qb_orders.get("id"))
+		quickbooks_purchase_invoice_list.append(qb_orders.get("Id"))
 		frappe.db.commit()	
 	return quickbooks_purchase_invoice_list
 
-def get_order_items(order_items):
+def get_order_items(order_items, quickbooks_settings):
 	"""Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks"""
  	items = []
  	for qb_item in order_items:
@@ -81,6 +81,7 @@ def get_order_items(order_items):
 				"description":qb_item['Description'] if qb_item.get('Description') else item_code,
 				"price_list_rate": qb_item['ItemBasedExpenseLineDetail']['UnitPrice'],
 				"qty": qb_item['ItemBasedExpenseLineDetail']['Qty'],
+				"expense_account": quickbooks_settings.expense_account,
 				"stock_uom": _("Nos")			
 			})
 		else:
@@ -113,7 +114,7 @@ def get_order_taxes(qb_orders):
 			taxes.append({
 				"category" : _("Total"),
 				"charge_type": _("Actual"),
-				"account_head": _("Commission on Sales") + " - " + Company_abbr,
+				"account_head": get_tax_account_head(),
 				"description": "Total Tax added from invoice",
 				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
@@ -129,6 +130,16 @@ def get_order_taxes(qb_orders):
 		# 			})
 			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
 	return taxes
+
+
+def get_tax_account_head():
+	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \
+		{"parent": "Quickbooks Settings"}, "tax_account")
+
+	if not tax_account:
+		frappe.throw("Tax Account not specified for Shopify Tax ")
+
+	return tax_account
 
 from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.base import Ref

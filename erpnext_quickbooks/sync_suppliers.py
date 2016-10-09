@@ -22,16 +22,16 @@ def sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list):
 
 def create_Supplier(qb_supplier, quickbooks_supplier_list):
 	""" store in ERPNEXT """ 
-
 	supplier = None
 	try:	
-		supplier = frappe.new_doc("Supplier")
-		supplier.quickbooks_supp_id = str(qb_supplier.get('Id')) if qb_supplier.get('Id')  else str(qb_supplier.get('value'))
-		supplier.supplier_name = str(qb_supplier.get('DisplayName')) if qb_supplier.get('DisplayName')  else str(qb_supplier.get('name'))
-		supplier.supplier_type = _("Distributor")
-		supplier.default_currency =qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else ''
-		supplier.insert()
-		
+		supplier = frappe.get_doc({
+			"doctype": "Supplier",
+			"quickbooks_supp_id": str(qb_supplier.get('Id')) if qb_supplier.get('Id')  else str(qb_supplier.get('value')),
+			"supplier_name" : str(qb_supplier.get('DisplayName')) if qb_supplier.get('DisplayName')  else str(qb_supplier.get('name')),
+			"supplier_type" :  _("Distributor"),
+			"default_currency" : qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else '',
+		}).insert()
+
 		if supplier and qb_supplier.get('BillAddr'):
 			create_supplier_address(supplier, qb_supplier.get("BillAddr"))
 		frappe.db.commit()

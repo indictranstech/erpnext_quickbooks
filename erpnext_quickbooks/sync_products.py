@@ -26,64 +26,20 @@ def create_Item(quickbooks_obj):
 				item.quickbooks_item_synctoken = cstr(fields.get('SyncToken'))
 				item.item_code = cstr(fields.get('Name')) or cstr(fields.get('Id'))
 				item.item_name = cstr(fields.get('Name'))
-				item.is_sales_item = 1
+				item.is_stock_item = False if qb_item.get('Type') == 'NonInventory' or qb_item.get('Type') == 'Service' else True
+				item.is_fixed_asset = True if qb_item.get('Type') == 'NonInventory' else False
 				item.stock_uom = _("Nos")
 				item.item_group = _("Consumable")
-				item.is_stock_item = False if fields.get('Type') == 'NonInventory' or fields.get('Type') == 'Service' else True
 				item.disabled = True if fields.get('Active') == 'True' else False
 				item.barcode = fields.get('Sku') if fields.get('Sku') else ''
 				item.description = fields.get('Description') if fields.get('Description') else fields.get('Name')
 				quickbooks_item_list.append(str(fields.get('Id')))
 				item.insert()
-				#update_stock(fields)
 	except Exception, e:
 		if e.args[0] and e.args[0].startswith("402"):
 			raise e
 	return item
 
-
-# def sync_Item(quickbooks_obj):
-# 	"""Fetch Item data from QuickBooks"""
-# 	quickbooks_Item_list = []
-# 	item_query = """SELECT * FROM  Item""" 
-# 	qb_item = quickbooks_obj.query(item_query)
-# 	get_qb_item =  qb_item['QueryResponse']['Item']
-# 	sync_qb_items(get_qb_item, quickbooks_Item_list)
-	
-# def sync_qb_items(get_qb_item, quickbooks_Item_list):
-# 	for qb_item in get_qb_item:
-# 		if not frappe.db.get_value("Item", {"quickbooks_item_id": qb_item.get('id')}, "name"):
-# 			create_item(qb_item, quickbooks_Item_list)
-
-# def create_item(qb_item, quickbooks_Item_list):
-# 	""" Fetch Item data from QuickBooks and store in ERPNEXT """ 
-# 	try:
-# 		item = frappe.get_doc({
-# 		"doctype": "Item",
-# 		"quickbooks_item_id" : cstr(fields.get('Id')),
-# 		"item_code" : cstr(fields.get('Name')) or cstr(fields.get('Id')),
-# 		"item_name" : cstr(fields.get('Name')),
-# 		"is_sales_item" : 1,
-# 		"stock_uom" : _("Nos"),
-# 		"item_group" : _("Consumable"),
-# 		"is_stock_item" : False if fields.get('Type') == 'NonInventory' or fields.get('Type') == 'Service' else True,
-# 		"disabled" : True if fields.get('Active') == 'True' else False,
-# 		"barcode" : fields.get('Sku') if fields.get('Sku') else '',
-# 		"description" : fields.get('Description') if fields.get('Description') else fields.get('Name')
-# 		})
-# 		item.flags.ignore_mandatory = True
-# 		item.insert()
-# 		quickbooks_item_list.append(str(fields.get('Id')))
-# 		frappe.db.commit()	
-# 	except Exception, e:
-# 		if e.args[0] and e.args[0].startswith("402"):
-# 			raise e
-# 		else:
-# 			make_quickbooks_log(title=e.message, status="Error", method="create_item", message=frappe.get_traceback(),
-# 				request_data=qb_item, exception=True)
-# 	return quickbooks_customer_list
-
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																												
 
 def sync_erp_items():
 	response_from_quickbooks = sync_erp_items_to_quickbooks()

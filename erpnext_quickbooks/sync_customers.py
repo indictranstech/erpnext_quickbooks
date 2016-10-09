@@ -25,16 +25,16 @@ def create_customer(qb_customer, quickbooks_customer_list):
 	""" store Customer data in ERPNEXT """ 
 	customer = None
 	try:	
-		customer = frappe.new_doc("Customer")
-		customer.quickbooks_cust_id = str(qb_customer.get('Id')) if qb_customer.get('Id')  else str(qb_customer.get('value'))
-		customer.customer_name = str(qb_customer.get('DisplayName')) if qb_customer.get('DisplayName')  else str(qb_customer.get('name'))
-		customer.customer_type = _("Individual")
-		customer.customer_group =_("Commercial")
-		customer.default_currency =qb_customer['CurrencyRef'].get('value','') if qb_customer.get('CurrencyRef') else ''
-		customer.territory = _("All Territories")
-		customer.flags.ignore_mandatory = True
-		customer.insert()
-
+		customer = frappe.get_doc({
+			"doctype": "Customer",
+			"quickbooks_cust_id": str(qb_customer.get('Id')) if qb_customer.get('Id')  else str(qb_customer.get('value')),
+			"customer_name" : str(qb_customer.get('DisplayName')) if qb_customer.get('DisplayName')  else str(qb_customer.get('name')),
+			"customer_type" : _("Individual"),
+			"customer_group" : _("Commercial"),
+			"default_currency" : qb_customer['CurrencyRef'].get('value','') if qb_customer.get('CurrencyRef') else '',
+			"territory" : _("All Territories"),
+		}).insert()
+		
 		if customer and qb_customer.get('BillAddr'):
 			create_customer_address(customer, qb_customer.get("BillAddr"))
 		frappe.db.commit()

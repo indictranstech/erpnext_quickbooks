@@ -34,8 +34,7 @@ cur_frm.cscript.connect_to_qb = function () {
 	 			freeze_message:"Please wait.. connecting to Quickbooks ................",
 				callback: function(r) {
 					if(r.message){
-						pop_up_window(decodeURIComponent(r.message),"Quickbooks",400);
-						me.quickbooks_authentication_url = r.message;
+						pop_up_window(decodeURIComponent(r.message),"Quickbooks");
 					}
 				}
 		});
@@ -60,7 +59,5 @@ cur_frm.cscript.sync_data_to_qb = function (frm) {
 },
 
 pop_up_window = function(url,windowName) {
-       newwindow=window.open(url,windowName,'height=400,width=600 ,top= 200, left=400');
-       if (window.focus){newwindow.focus()}
-       return false;
- }
+	window.location.assign(url)
+}
