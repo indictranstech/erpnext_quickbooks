@@ -8,7 +8,6 @@ import requests.exceptions
 from .utils import make_quickbooks_log
 
 
-
 """Sync all the Purchase Invoice from Quickbooks to ERPNEXT"""
 
 def sync_pi_orders(quickbooks_obj):
@@ -44,9 +43,10 @@ def valid_supplier_and_product(qb_orders):
 
 def create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, company=None):
 	""" Store Sales Invoice in ERPNEXT """
-	create_purchase_invoice(qb_orders, quickbooks_purchase_invoice_list, company=None)
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, company=None)
 
-def create_purchase_invoice(qb_orders, quickbooks_purchase_invoice_list, company=None):
+def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, company=None):
 	pi = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": qb_orders.get("Id")}, "name") 
 	if not pi:
 		pi = frappe.get_doc({
@@ -54,21 +54,21 @@ def create_purchase_invoice(qb_orders, quickbooks_purchase_invoice_list, company
 			"quickbooks_purchase_invoice_id" : qb_orders.get("Id"),
 			"naming_series": "PI-Quickbooks-",
 			"supplier": frappe.db.get_value("Supplier",{"quickbooks_supp_id":qb_orders['VendorRef'].get('value')},"name"),
-			"posting_date": nowdate(),
-			"buying_price_list": "Standard Buying",
+			"posting_date": qb_orders.get('TxnDate'),
+			"buying_price_list": quickbooks_settings.buying_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
-			"items": get_order_items(qb_orders['Line']),
+			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
 			"taxes": get_order_taxes(qb_orders)
 		})
 		pi.flags.ignore_mandatory = True
 		pi.save(ignore_permissions=True)
 		pi.submit()
-		quickbooks_purchase_invoice_list.append(qb_orders.get("id"))
+		quickbooks_purchase_invoice_list.append(qb_orders.get("Id"))
 		frappe.db.commit()	
 	return quickbooks_purchase_invoice_list
 
-def get_order_items(order_items):
+def get_order_items(order_items, quickbooks_settings):
 	"""Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks"""
  	items = []
  	for qb_item in order_items:
@@ -81,6 +81,7 @@ def get_order_items(order_items):
 				"description":qb_item['Description'] if qb_item.get('Description') else item_code,
 				"price_list_rate": qb_item['ItemBasedExpenseLineDetail']['UnitPrice'],
 				"qty": qb_item['ItemBasedExpenseLineDetail']['Qty'],
+				"expense_account": quickbooks_settings.expense_account,
 				"stock_uom": _("Nos")			
 			})
 		else:
@@ -113,7 +114,7 @@ def get_order_taxes(qb_orders):
 			taxes.append({
 				"category" : _("Total"),
 				"charge_type": _("Actual"),
-				"account_head": _("Commission on Sales") + " - " + Company_abbr,
+				"account_head": get_tax_account_head(),
 				"description": "Total Tax added from invoice",
 				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
@@ -131,6 +132,16 @@ def get_order_taxes(qb_orders):
 	return taxes
 
 
+def get_tax_account_head():
+	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \
+		{"parent": "Quickbooks Settings"}, "tax_account")
+
+	if not tax_account:
+		frappe.throw("Tax Account not specified for Shopify Tax ")
+
+	return tax_account
+
+from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.base import Ref
 from pyqb.quickbooks.objects.bill import Bill, BillLine, AccountBasedExpenseLineDetail, ItemBasedExpenseLineDetail
 
@@ -166,8 +177,6 @@ def sync_erp_purchase_invoices_to_quickbooks():
 					request_data=erp_purchase_invoice, exception=True)
 	results = batch_create(Purchase_invoice_list)
 	return results
-
-
 
 def erp_purchase_invoice_data():
 	"""ERPNext Invoices Record"""

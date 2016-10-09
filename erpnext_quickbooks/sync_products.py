@@ -14,7 +14,7 @@ def create_Item(quickbooks_obj):
  
 	item = None
 	quickbooks_item_list = []
-	item_query = """SELECT MetaData, Name, Sku, Description, Active, Taxable, SalesTaxIncluded, UnitPrice, Type, IncomeAccountRef, PurchaseTaxCodeRef, PurchaseCost, SalesTaxCodeRef, AbatementRate, ExpenseAccountRef, PurchaseTaxCodeRef,  SyncToken , MetaData FROM Item ORDER BY Id DESC""" 
+	item_query = """SELECT * FROM Item""" 
 	fetch_item_qb = quickbooks_obj.query(item_query)
 	qb_item =  fetch_item_qb['QueryResponse']
 	
@@ -26,10 +26,10 @@ def create_Item(quickbooks_obj):
 				item.quickbooks_item_synctoken = cstr(fields.get('SyncToken'))
 				item.item_code = cstr(fields.get('Name')) or cstr(fields.get('Id'))
 				item.item_name = cstr(fields.get('Name'))
-				item.is_sales_item = 1
+				item.is_stock_item = False if qb_item.get('Type') == 'NonInventory' or qb_item.get('Type') == 'Service' else True
+				item.is_fixed_asset = True if qb_item.get('Type') == 'NonInventory' else False
 				item.stock_uom = _("Nos")
 				item.item_group = _("Consumable")
-				item.is_stock_item = False if fields.get('Type') == 'NonInventory' else True
 				item.disabled = True if fields.get('Active') == 'True' else False
 				item.barcode = fields.get('Sku') if fields.get('Sku') else ''
 				item.description = fields.get('Description') if fields.get('Description') else fields.get('Name')
