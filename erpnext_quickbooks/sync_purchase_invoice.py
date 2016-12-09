@@ -14,8 +14,9 @@ def sync_pi_orders(quickbooks_obj):
 	quickbooks_purchase_invoice_list =[] 
 	purchase_invoice_query = """SELECT * FROM Bill""" 
 	qb_purchase_invoice = quickbooks_obj.query(purchase_invoice_query)
-	get_qb_purchase_invoice =  qb_purchase_invoice['QueryResponse']	
-	sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
+	if qb_purchase_invoice['QueryResponse']:
+		get_qb_purchase_invoice =  qb_purchase_invoice['QueryResponse']
+		sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
 def sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list):
 	for qb_orders in get_qb_purchase_invoice['Bill']:
@@ -70,6 +71,8 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 
 def get_order_items(order_items, quickbooks_settings):
 	"""Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks"""
+ 	print order_items
+ 	print "\n\n"
  	items = []
  	for qb_item in order_items:
  		"""Get all the Items details from PI(bill)"""
@@ -77,25 +80,28 @@ def get_order_items(order_items, quickbooks_settings):
 			item_code = get_item_code(qb_item)
 			items.append({
 				"item_code": item_code if item_code else '',
-				"item_name": item_code if item_code else qb_item['Description'],
-				"description":qb_item['Description'] if qb_item.get('Description') else item_code,
-				"price_list_rate": qb_item['ItemBasedExpenseLineDetail']['UnitPrice'],
-				"qty": qb_item['ItemBasedExpenseLineDetail']['Qty'],
+				"item_name": item_code if item_code else qb_item.get('Description')[:35],
+				"description":qb_item.get('Description') if qb_item.get('Description') else '',
+				"price_list_rate": qb_item.get('ItemBasedExpenseLineDetail').get('UnitPrice'),
+				"qty": qb_item.get('ItemBasedExpenseLineDetail').get('Qty'),
 				"expense_account": quickbooks_settings.expense_account,
 				"stock_uom": _("Nos")			
 			})
 		else:
 		 	"""Get all Account details from PI(bill)"""
-		 	quickbooks_account_reference = qb_item['AccountBasedExpenseLineDetail']['AccountRef']['value']
+		 	quickbooks_account_reference = qb_item.get('AccountBasedExpenseLineDetail').get('AccountRef').get('value')
+		 	print  quickbooks_account_reference, "----------"
 		 	quickbooks_account = frappe.db.get_value("Account", {"quickbooks_account_id" : quickbooks_account_reference}, "name")
+		 	print quickbooks_account,"quickbooks_account"
 		 	items.append({
-				"item_name": qb_item['Description'] if qb_item.get('Description') else quickbooks_account,
-				"description":qb_item['Description'] + _(" Service Item") if qb_item.get('Description') else quickbooks_account,
-				"price_list_rate": qb_item['Amount'],
+				"item_name": quickbooks_account if quickbooks_account else  qb_item.get('Description')[:35],
+				"description":qb_item.get('Description') + _(" Service Item") if qb_item.get('Description') else quickbooks_account,
+				"price_list_rate": qb_item.get('Amount'),
 				"qty": 1,
 				"expense_account": quickbooks_account,
 				"stock_uom": _("Nos")			
 			})
+	print items,"items-----------"		
 	return items
 
 def get_item_code(qb_item):
@@ -109,14 +115,14 @@ def get_order_taxes(qb_orders):
 	Default_company = frappe.defaults.get_defaults().get("company")
 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
 	
-	if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
-		if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
+	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
+		if qb_orders.get('GlobalTaxCalculation') == 'TaxExcluded' and qb_orders.get('TxnTaxDetail').get('TaxLine'):
 			taxes.append({
 				"category" : _("Total"),
 				"charge_type": _("Actual"),
 				"account_head": get_tax_account_head(),
 				"description": "Total Tax added from invoice",
-				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
+				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
 			})
 		# else:

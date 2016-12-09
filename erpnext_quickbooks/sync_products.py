@@ -8,38 +8,45 @@ from .utils import make_quickbooks_log
 from pyqb.quickbooks.batch import batch_create
 from pyqb.quickbooks.objects.item import Item
 
-
 def create_Item(quickbooks_obj):
 	""" Fetch Item data from QuickBooks and store in ERPNEXT """ 
  
 	item = None
 	quickbooks_item_list = []
-	item_query = """SELECT * FROM Item""" 
-	fetch_item_qb = quickbooks_obj.query(item_query)
-	qb_item =  fetch_item_qb['QueryResponse']
+	quickbook_product = []
+	record_count = quickbooks_obj.query("""SELECT count(*) from Item""")
+	total_record = record_count['QueryResponse']['totalCount']
+	limit_count = 90
+	total_page = total_record / limit_count
+	STARTPOSITION,MAXRESULTS = 0,0  
+	for i in range(total_page + 1):
+		MAXRESULTS = STARTPOSITION + limit_count
+		item_query = """SELECT * FROM Item ORDER BY Id ASC STARTPOSITION {0} MAXRESULTS {1} """.format(STARTPOSITION, MAXRESULTS)
+		fetch_item_qb = quickbooks_obj.query(item_query)
+		qb_item =  fetch_item_qb['QueryResponse']
+		if qb_item:
+			quickbook_product.extend(qb_item['Item'])
+		STARTPOSITION = STARTPOSITION + limit_count
 	
 	try:
-		item = frappe.new_doc("Item")
-		for fields in qb_item['Item']:
-			if not frappe.db.get_value("Item", {"quickbooks_item_id": str(fields.get('Id'))}, "name"):
-				item.quickbooks_item_id = cstr(fields.get('Id'))
-				item.quickbooks_item_synctoken = cstr(fields.get('SyncToken'))
-				item.item_code = cstr(fields.get('Name')) or cstr(fields.get('Id'))
-				item.item_name = cstr(fields.get('Name'))
-				item.is_stock_item = False if qb_item.get('Type') == 'NonInventory' or qb_item.get('Type') == 'Service' else True
-				item.is_fixed_asset = True if qb_item.get('Type') == 'NonInventory' else False
-				item.stock_uom = _("Nos")
-				item.item_group = _("Consumable")
-				item.disabled = True if fields.get('Active') == 'True' else False
-				item.barcode = fields.get('Sku') if fields.get('Sku') else ''
-				item.description = fields.get('Description') if fields.get('Description') else fields.get('Name')
-				quickbooks_item_list.append(str(fields.get('Id')))
-				item.insert()
+		if qb_item:
+			item = frappe.new_doc("Item")
+			for fields in quickbook_product:
+				if not frappe.db.get_value("Item", {"quickbooks_item_id": str(fields.get('Id'))}, "name"):
+					item.quickbooks_item_id = cstr(fields.get('Id'))
+					item.item_code = cstr(fields.get('Name')) or cstr(fields.get('Id'))
+					item.item_name = cstr(fields.get('Name'))
+					item.is_stock_item = False if fields.get('Type') == 'NonInventory' or fields.get('Type') == 'Service' else True
+					item.stock_uom = _("Nos")
+					item.item_group = _("Consumable")
+					item.disabled = True if fields.get('Active') == 'True' else False
+					item.description = fields.get('Description') if fields.get('Description') else fields.get('Name')
+					quickbooks_item_list.append(str(fields.get('Id')))
+					item.insert()
 	except Exception, e:
 		if e.args[0] and e.args[0].startswith("402"):
 			raise e
 	return item
-
 
 def sync_erp_items():
 	response_from_quickbooks = sync_erp_items_to_quickbooks()

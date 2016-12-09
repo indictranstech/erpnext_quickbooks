@@ -19,6 +19,17 @@ from .sync_entries import *
 from .sync_account import *
 
 
+QUICKBOOKS_CLIENT_KEY = ""
+QUICKBOOKS_CLIENT_SECRET = ""
+authorize_url = ""
+request_token = ""
+request_token_secret = ""
+access_token = ""
+access_token_secret = ""
+realm_id = ""
+callback_url=""
+
+
 @frappe.whitelist()
 def sync_quickbooks():
 	"Enqueue longjob for Syncing quickbooks Online"
@@ -38,21 +49,24 @@ def sync_quickbooks_resources():
 			if quickbooks_settings.quickbooks_to_erpnext:
 				validate_quickbooks_settings(quickbooks_settings)
 				sync_from_quickbooks_to_erp(quickbooks_settings)
+				if quickbooks_settings.erpnext_to_quickbooks:
+					pass
+					# sync_from_erp_to_quickbooks(quickbooks_settings)
 				make_quickbooks_log(title="Sync Completed", status="Success", method=frappe.local.form_dict.cmd, 
 				message= "Updated {customers} customer(s)")
 
 		except Exception, e:
-			if e.args[0]:
-				make_quickbooks_log(
-					title="QuickBooks has suspended your account",
-					status="Error",
-					method="sync_quickbooks_resources",
-					message=_("""QuickBooks has suspended your account till you complete the payment. We have disabled ERPNext Quickbooks Sync. Please enable it once your complete the payment at Quickbooks Online."""),
-					exception=True)
+			# if e.args[0]:
+			# 	make_quickbooks_log(
+			# 		title="QuickBooks has suspended your account",
+			# 		status="Error",
+			# 		method="sync_quickbooks_resources",
+			# 		message=_("""QuickBooks has suspended your account till you complete the payment. We have disabled ERPNext Quickbooks Sync. Please enable it once your complete the payment at Quickbooks Online."""),
+			# 		exception=True)
 					
-				disable_quickbooks_sync_on_exception()
+			# 	disable_quickbooks_sync_on_exception()
 			
-			else:
+			# else:
 				make_quickbooks_log(
 					title="sync has terminated",
 					status="Error",
@@ -67,7 +81,19 @@ def sync_quickbooks_resources():
 
 
 def sync_from_quickbooks_to_erp(quickbooks_settings):
-
+	global realm_id
+	global access_token
+	global access_token_secret
+	global authorize_url
+	global request_token
+	global request_token_secret
+	global QUICKBOOKS_CLIENT_KEY
+	global QUICKBOOKS_CLIENT_SECRET
+	realm_id =quickbooks_settings.realm_id
+	access_token =quickbooks_settings.access_token
+	access_token_secret = quickbooks_settings.access_token_secret
+	QUICKBOOKS_CLIENT_KEY = quickbooks_settings.consumer_key
+	QUICKBOOKS_CLIENT_SECRET = quickbooks_settings.consumer_secret
 	quickbooks_obj = QuickBooks(
 	    sandbox=True,
 	    consumer_key=quickbooks_settings.consumer_key,
@@ -76,6 +102,7 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	    access_token_secret=quickbooks_settings.access_token_secret,
 	    company_id=quickbooks_settings.realm_id
 	)
+	frappe.db.set_value("Quickbooks Settings", None, "last_sync_datetime", frappe.utils.now())
 	sync_customers(quickbooks_obj)
 	sync_suppliers(quickbooks_obj)
 	create_Employee(quickbooks_obj)
@@ -87,7 +114,6 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	payment_invoice(quickbooks_obj)
 	bill_payment(quickbooks_obj)
 	sync_entry(quickbooks_obj)
-	frappe.db.set_value("Quickbooks Settings", None, "last_sync_datetime", frappe.utils.now())
 
 def validate_quickbooks_settings(quickbooks_settings):
 	"""
@@ -101,11 +127,19 @@ def validate_quickbooks_settings(quickbooks_settings):
 
 
 
-def sync_from_erp_to_quickbooks():
-	sync_erp_customers()
-	sync_erp_suppliers()
-	sync_erp_employees()
-	sync_erp_accounts()
-	sync_erp_items()
-	sync_erp_purchase_invoices()
-	sync_erp_purchase_invoices()
+def sync_from_erp_to_quickbooks(quickbooks_settings):
+	quickbooks_obj = QuickBooks(
+	    sandbox=True,
+	    consumer_key=quickbooks_settings.consumer_key,
+	    consumer_secret=quickbooks_settings.consumer_secret,
+	    access_token=quickbooks_settings.access_token,
+	    access_token_secret=quickbooks_settings.access_token_secret,
+	    company_id=quickbooks_settings.realm_id
+	)
+	# sync_erp_customers(quickbooks_obj)
+	# sync_erp_suppliers(quickbooks_obj)
+	# sync_erp_employees()
+	# sync_erp_accounts(quickbooks_obj)
+	# sync_erp_items()
+	# sync_erp_sales_invoices(quickbooks_obj)
+	# sync_erp_purchase_invoices()

@@ -13,21 +13,22 @@ def create_Employee(quickbooks_obj):
 	quickbooks_employee_list = []
 	employee_query = """SELECT Id, DisplayName, PrimaryPhone, Gender, PrimaryEmailAddr, BirthDate, HiredDate, ReleasedDate FROM Employee""" 
 	qb_employee = quickbooks_obj.query(employee_query)
-	get_qb_employee =  qb_employee['QueryResponse']['Employee']
+	get_qb_employee =  qb_employee['QueryResponse']
 	
-	try:	
-		employee = frappe.new_doc("Employee")
-		for fields in get_qb_employee:
-			if not frappe.db.get_value("Employee", {"quickbooks_emp_id": str(fields.get('Id'))}, "name"):
-				employee.employee_name = fields.get('DisplayName')
-				employee.quickbooks_emp_id = str(fields.get('Id'))
-				employee.date_of_joining = fields.get('HiredDate') if fields.get('HiredDate') else strftime("%Y-%m-%d")
-				employee.date_of_birth = fields.get('BirthDate') if fields.get('BirthDate') else "2016-04-01"
-				employee.gender = fields.get('Gender') if fields.get('Gender') else "Male"
-				employee.cell_number =fields['Mobile'].get('FreeFormNumber','') if fields.get('Mobile') else ''
-				employee.personal_email =fields['PrimaryEmailAddr'].get('Address','') if fields.get('PrimaryEmailAddr') else ''
-				employee.insert()
-				quickbooks_employee_list.append(str(fields.get('Id')))
+	try:
+		if get_qb_employee:
+			employee = frappe.new_doc("Employee")
+			for fields in get_qb_employee['Employee']:
+				if not frappe.db.get_value("Employee", {"quickbooks_emp_id": str(fields.get('Id'))}, "name"):
+					employee.employee_name = fields.get('DisplayName')
+					employee.quickbooks_emp_id = str(fields.get('Id'))
+					employee.date_of_joining = fields.get('HiredDate') if fields.get('HiredDate') else strftime("%Y-%m-%d")
+					employee.date_of_birth = fields.get('BirthDate') if fields.get('BirthDate') else "2016-04-01"
+					employee.gender = fields.get('Gender') if fields.get('Gender') else "Male"
+					employee.cell_number =fields['Mobile'].get('FreeFormNumber','') if fields.get('Mobile') else ''
+					employee.personal_email =fields['PrimaryEmailAddr'].get('Address','') if fields.get('PrimaryEmailAddr') else ''
+					employee.insert()
+					quickbooks_employee_list.append(str(fields.get('Id')))
 	except Exception, e:
 		if e.args[0] and e.args[0].startswith("402"):
 			raise e

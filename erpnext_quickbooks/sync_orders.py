@@ -12,8 +12,9 @@ def sync_si_orders(quickbooks_obj):
 	quickbooks_invoice_list = [] 
 	invoice_query = """SELECT * FROM Invoice""" 
 	qb_invoice = quickbooks_obj.query(invoice_query)
-	get_qb_invoice =  qb_invoice['QueryResponse']	
-	sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
+	if qb_invoice['QueryResponse']:
+		get_qb_invoice =  qb_invoice['QueryResponse']
+		sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
 
 def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
 	for qb_orders in get_qb_invoice['Invoice']:
@@ -74,10 +75,10 @@ def get_order_items(order_items, quickbooks_settings):
 			item_code = get_item_code(qb_item)
 			items.append({
 				"item_code": item_code if item_code else '',
-				"item_name": qb_item.get('Description') if qb_item.get('Description') else '',
+				"item_name": qb_item.get('Description')[:35] if qb_item.get('Description') else '',
 				"description": qb_item.get('Description') if qb_item.get('Description') else '',
-				"rate": qb_item.get('SalesItemLineDetail').get('UnitPrice'),
-				"qty": qb_item.get('SalesItemLineDetail').get('Qty'),
+				"rate": qb_item.get('SalesItemLineDetail').get('UnitPrice') if qb_item.get('SalesItemLineDetail').get('UnitPrice') else qb_item.get('Amount'),
+				"qty": qb_item.get('SalesItemLineDetail').get('Qty') if qb_item.get('SalesItemLineDetail').get('Qty') else 1,
 				"income_account": quickbooks_settings.cash_bank_account,
 				"stock_uom": _("Nos")			
 			})
@@ -96,13 +97,13 @@ def get_order_taxes(qb_orders):
 	Default_company = frappe.defaults.get_defaults().get("company")
 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
 
-	if not qb_orders['GlobalTaxCalculation'] == 'NotApplicable':
-		if qb_orders['GlobalTaxCalculation'] == 'TaxExcluded' and qb_orders['TxnTaxDetail']['TaxLine']:
+	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
+		if qb_orders.get('GlobalTaxCalculation') == 'TaxExcluded' and qb_orders.get('TxnTaxDetail').get('TaxLine'):
 			taxes.append({
 				"charge_type": _("Actual"),
 				"account_head": get_tax_account_head(),
 				"description": _("Total Tax added from invoice"),
-				"tax_amount": qb_orders['TxnTaxDetail']['TotalTax'] 
+				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
 			})
 			
@@ -138,21 +139,22 @@ from pyqb.quickbooks.objects.detailline import SaleItemLine, SalesItemLineDetail
 
 
 """	Sync Invoices Records From ERPNext to QuickBooks """
-def sync_erp_sales_invoices():
+def sync_erp_sales_invoices(quickbooks_obj):
 	"""Receive Response From Quickbooks and Update quickbooks_invoce_id in Invoices"""
-	response_from_quickbooks = sync_erp_sales_invoices_to_quickbooks()
+	response_from_quickbooks = sync_erp_sales_invoices_to_quickbooks(quickbooks_obj)
 	if response_from_quickbooks:
 		try:
 			for response_obj in response_from_quickbooks.successes:
 				if response_obj:
 					frappe.db.sql("""UPDATE `tabSales Invoice` SET quickbooks_invoce_id = %s WHERE name ='%s'""" %(response_obj.Id, response_obj.DocNumber))
+					frappe.db.commit()
 				else:
 					raise _("Does not get any response from quickbooks")	
 		except Exception, e:
 			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_sales_invoices", message=frappe.get_traceback(),
 				request_data=response_obj, exception=True)
 
-def sync_erp_sales_invoices_to_quickbooks():
+def sync_erp_sales_invoices_to_quickbooks(quickbooks_obj):
 	"""Sync ERPNext Invoice to QuickBooks"""
 	Sales_invoice_list = []
 	for erp_sales_invoice in erp_sales_invoice_data():

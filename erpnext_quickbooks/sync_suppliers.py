@@ -11,8 +11,9 @@ def sync_suppliers(quickbooks_obj):
 	quickbooks_supplier_list = []
 	supplier_query = """SELECT  DisplayName, CurrencyRef, Id, BillAddr FROM  Vendor""" 
 	qb_supplier = quickbooks_obj.query(supplier_query)
-	get_qb_supplier =  qb_supplier['QueryResponse']['Vendor']
-	sync_qb_suppliers(get_qb_supplier,quickbooks_supplier_list)
+	if qb_supplier['QueryResponse']:
+		get_qb_supplier =  qb_supplier['QueryResponse']['Vendor']
+		sync_qb_suppliers(get_qb_supplier,quickbooks_supplier_list)
 
 	
 def sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list):
@@ -32,8 +33,8 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 			"default_currency" : qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else '',
 		}).insert()
 
-		if supplier and qb_supplier.get('BillAddr'):
-			create_supplier_address(supplier, qb_supplier.get("BillAddr"))
+		# if supplier and qb_supplier.get('BillAddr'):
+		# 	create_supplier_address(supplier, qb_supplier.get("BillAddr"))
 		frappe.db.commit()
 		quickbooks_supplier_list.append(supplier.quickbooks_supp_id)
 
@@ -78,21 +79,22 @@ def get_address_title_and_type(supplier_name):
 
 
 """Sync Supplier From Erpnext to Quickbooks"""
-def sync_erp_suppliers():
+def sync_erp_suppliers(quickbooks_obj):
 	"""Receive Response From Quickbooks and Update quickbooks_supp_id for Supplier"""
-	response_from_quickbooks = sync_erp_suppliers_to_quickbooks()
+	response_from_quickbooks = sync_erp_suppliers_to_quickbooks(quickbooks_obj)
 	if response_from_quickbooks:
 		try:
 			for response_obj in response_from_quickbooks.successes:
 				if response_obj:
-					frappe.db.sql("""UPDATE tabSupplier SET quickbooks_supp_id = %s WHERE employee_name ='%s'""" %(response_obj.Id, response_obj.DisplayName))
+					frappe.db.sql("""UPDATE tabSupplier SET quickbooks_supp_id = %s WHERE supplier_name ='%s'""" %(response_obj.Id, response_obj.DisplayName))
+					frappe.db.commit()
 				else:
 					raise _("Does not get any response from quickbooks")	
 		except Exception, e:
 			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_suppliers", message=frappe.get_traceback(),
 				request_data=response_obj, exception=True)
 
-def sync_erp_suppliers_to_quickbooks():
+def sync_erp_suppliers_to_quickbooks(quickbooks_obj):
 	Supplier_list = []
 	for erp_supplier in erp_supplier_data():
 		try:
