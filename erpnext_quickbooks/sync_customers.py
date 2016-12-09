@@ -11,8 +11,9 @@ def sync_customers(quickbooks_obj):
 	quickbooks_customer_list = []
 	customer_query = """SELECT * FROM  Customer""" 
 	qb_customer = quickbooks_obj.query(customer_query)
-	get_qb_customer =  qb_customer['QueryResponse']['Customer']
-	sync_qb_customers(get_qb_customer,quickbooks_customer_list)
+	if qb_customer['QueryResponse']:
+		get_qb_customer =  qb_customer['QueryResponse']['Customer']
+		sync_qb_customers(get_qb_customer,quickbooks_customer_list)
 	
 def sync_qb_customers(get_qb_customer, quickbooks_customer_list):
 	for qb_customer in get_qb_customer:
@@ -35,8 +36,8 @@ def create_customer(qb_customer, quickbooks_customer_list):
 			"territory" : _("All Territories"),
 		}).insert()
 		
-		if customer and qb_customer.get('BillAddr'):
-			create_customer_address(customer, qb_customer.get("BillAddr"))
+		# if customer and qb_customer.get('BillAddr'):
+		# 	create_customer_address(customer, qb_customer.get("BillAddr"))
 		frappe.db.commit()
 		quickbooks_customer_list.append(customer.quickbooks_cust_id)
 
@@ -84,27 +85,28 @@ def get_address_title_and_type(customer_name):
 
 """	Sync Customer Records From ERPNext to QuickBooks """
 
-def sync_erp_customers():
+def sync_erp_customers(quickbooks_obj):
 	"""Receive Response From Quickbooks and Update quickbooks_cust_id in Customer"""
-	response_from_quickbooks = sync_erp_customers_to_quickbooks()
+	response_from_quickbooks = sync_erp_customers_to_quickbooks(quickbooks_obj)
 	if response_from_quickbooks:
 		try:
 			for response_obj in response_from_quickbooks.successes:
 				if response_obj:
-					frappe.db.sql("""UPDATE tabCustomer SET quickbooks_cust_id = %s WHERE customer_name ='%s'""" %(response_obj.Id, response_obj.DisplayName))
+					frappe.db.sql("""UPDATE `tabCustomer` SET quickbooks_cust_id = '%s' WHERE customer_name ='%s'""" %(response_obj.Id, response_obj.DisplayName))
+					frappe.db.commit()
 				else:
 					raise _("Does not get any response from quickbooks")	
 		except Exception, e:
 			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_customers", message=frappe.get_traceback(),
 				request_data=response_obj, exception=True)
 
-def sync_erp_customers_to_quickbooks():
+def sync_erp_customers_to_quickbooks(quickbooks_obj):
 	"""Sync ERPNext Customer to QuickBooks"""
 	Customer_list = []
 	for erp_cust in erp_customer_data():
 		try:
 			if erp_cust:
-				create_erp_customer_to_quickbooks(erp_cust, Customer_list)
+				create_erp_customer_to_quickbooks(quickbooks_obj, erp_cust, Customer_list)
 			else:
 				raise _("Customer does not exist in ERPNext")
 		except Exception, e:
@@ -121,7 +123,7 @@ def erp_customer_data():
 	erp_customer = frappe.db.sql("""select `customer_name` from `tabCustomer` WHERE  quickbooks_cust_id IS NULL""" ,as_dict=1)
 	return erp_customer
 
-def create_erp_customer_to_quickbooks(erp_cust, Customer_list):
+def create_erp_customer_to_quickbooks(quickbooks_obj, erp_cust, Customer_list):
 	customer_obj = Customer()
 	customer_obj.FullyQualifiedName = erp_cust.customer_name
 	customer_obj.DisplayName = erp_cust.customer_name

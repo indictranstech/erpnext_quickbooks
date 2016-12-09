@@ -10,8 +10,9 @@ def sync_entry(quickbooks_obj):
 	"""Fetch JournalEntry data from QuickBooks"""
 	Entry = """SELECT * from JournalEntry""" 
 	qb_Entry = quickbooks_obj.query(Entry)
-	get_qb_Entry =  qb_Entry['QueryResponse']['JournalEntry']
-	sync_entries(get_qb_Entry)
+	if qb_Entry['QueryResponse']:
+		get_qb_Entry =  qb_Entry['QueryResponse']['JournalEntry']
+		sync_entries(get_qb_Entry)
 
 def sync_entries(get_qb_Entry):
 	for qb_journal_entry in get_qb_Entry:

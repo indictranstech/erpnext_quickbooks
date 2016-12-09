@@ -11,8 +11,9 @@ def payment_invoice(quickbooks_obj):
 	"""Fetch payment_invoice data from QuickBooks"""
 	payment = """SELECT * from Payment""" 
 	qb_payment = quickbooks_obj.query(payment)
-	get_qb_payment =  qb_payment['QueryResponse']['Payment']
-	sync_qb_journal_entry_against_si(get_qb_payment)
+	if qb_payment['QueryResponse']:
+		get_qb_payment =  qb_payment['QueryResponse']['Payment']
+		sync_qb_journal_entry_against_si(get_qb_payment)
 	
 def sync_qb_journal_entry_against_si(get_qb_payment):
 	for recived_payment in get_qb_payment:
@@ -66,8 +67,9 @@ def bill_payment(quickbooks_obj):
 	"""Fetch BillPayment data from QuickBooks"""
 	billpayment = """SELECT * FROM BillPayment""" 
 	qb_billpayment = quickbooks_obj.query(billpayment)
-	get_qb_billpayment =  qb_billpayment['QueryResponse']['BillPayment']
-	sync_qb_journal_entry_against_pi(get_qb_billpayment)
+	if qb_billpayment['QueryResponse']:
+		get_qb_billpayment =  qb_billpayment['QueryResponse']['BillPayment']
+		sync_qb_journal_entry_against_pi(get_qb_billpayment)
 	
 def sync_qb_journal_entry_against_pi(get_qb_billpayment):
 	for made_payment in get_qb_billpayment:

@@ -64,7 +64,7 @@ def quickbooks_authentication_popup(consumer_key, consumer_secret):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings")
 
 	quickbooks = QuickBooks(
-           sandbox=True,
+           sandbox = False,
            consumer_key = quickbooks_settings.consumer_key,
            consumer_secret = quickbooks_settings.consumer_secret,
            callback_url = 'http://'+ frappe.request.host + '/api/method/erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.First_callback'
