@@ -50,8 +50,7 @@ def sync_quickbooks_resources():
 				validate_quickbooks_settings(quickbooks_settings)
 				sync_from_quickbooks_to_erp(quickbooks_settings)
 				if quickbooks_settings.erpnext_to_quickbooks:
-					pass
-					# sync_from_erp_to_quickbooks(quickbooks_settings)
+					sync_from_erp_to_quickbooks(quickbooks_settings)
 				make_quickbooks_log(title="Sync Completed", status="Success", method=frappe.local.form_dict.cmd, 
 				message= "Updated {customers} customer(s)")
 
@@ -136,10 +135,10 @@ def sync_from_erp_to_quickbooks(quickbooks_settings):
 	    access_token_secret=quickbooks_settings.access_token_secret,
 	    company_id=quickbooks_settings.realm_id
 	)
-	# sync_erp_customers(quickbooks_obj)
-	# sync_erp_suppliers(quickbooks_obj)
+	sync_erp_customers(quickbooks_obj)
+	sync_erp_suppliers(quickbooks_obj)
 	# sync_erp_employees()
-	# sync_erp_accounts(quickbooks_obj)
+	sync_erp_accounts(quickbooks_obj)
 	# sync_erp_items()
-	# sync_erp_sales_invoices(quickbooks_obj)
+	sync_erp_sales_invoices(quickbooks_obj)
 	# sync_erp_purchase_invoices()
