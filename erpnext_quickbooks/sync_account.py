@@ -47,6 +47,7 @@ def create_account(qb_account, quickbooks_account_list):
 	Default_company = frappe.defaults.get_defaults().get("company")
 	Company_abbr = frappe.db.get_value("Company", {"name": Default_company}, "abbr")
 	
+	"company wise chart of accounts"
 	if Default_company == 'Singapore':
 		parent_account, root_type  = accounts_mapper_for_singapore(qb_account, Company_abbr)
 	else:
