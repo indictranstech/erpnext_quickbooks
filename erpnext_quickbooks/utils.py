@@ -38,3 +38,21 @@ name=None, request_data={}):
 		
 		log.save(ignore_permissions=True)
 		frappe.db.commit()
+
+def pagination(quickbooks_obj, business_objects):
+	quickbooks_result_set = []
+
+	record_count = quickbooks_obj.query("""SELECT count(*) from {0} """.format(business_objects))
+	total_record = record_count['QueryResponse']['totalCount']
+	limit_count = 90
+	total_page = total_record / limit_count
+	startposition , maxresults = 0, 0  
+	for i in range(total_page + 1):
+		maxresults = startposition + limit_count
+		query_result = """SELECT * FROM {0} ORDER BY Id Desc STARTPOSITION {1} MAXRESULTS {2}""".format(business_objects, startposition, maxresults)
+		qb_data = quickbooks_obj.query(query_result)
+		qb_result =  qb_data['QueryResponse']
+		if qb_result:
+			quickbooks_result_set.extend(qb_result[business_objects])
+		startposition = startposition + limit_count
+	return quickbooks_result_set

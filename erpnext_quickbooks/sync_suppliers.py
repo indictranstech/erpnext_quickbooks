@@ -2,18 +2,18 @@ from __future__ import unicode_literals
 import frappe
 from frappe import _
 import requests.exceptions
-from .utils import make_quickbooks_log
+from .utils import make_quickbooks_log, pagination
 from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.vendor import Vendor
 
 def sync_suppliers(quickbooks_obj):
 	""" Fetch Supplier data from QuickBooks"""
+	
 	quickbooks_supplier_list = []
-	supplier_query = """SELECT  DisplayName, CurrencyRef, Id, BillAddr FROM  Vendor""" 
-	qb_supplier = quickbooks_obj.query(supplier_query)
-	if qb_supplier['QueryResponse']:
-		get_qb_supplier =  qb_supplier['QueryResponse']['Vendor']
-		sync_qb_suppliers(get_qb_supplier,quickbooks_supplier_list)
+	business_objects = "Vendor"
+	get_qb_supplier =  pagination(quickbooks_obj, business_objects)
+	if get_qb_supplier:
+		sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list)
 
 	
 def sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list):
@@ -22,7 +22,7 @@ def sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list):
 			create_Supplier(qb_supplier, quickbooks_supplier_list)
 
 def create_Supplier(qb_supplier, quickbooks_supplier_list):
-	""" store in ERPNEXT """ 
+	""" Store Supplier Data in ERPNEXT """ 
 	supplier = None
 	try:	
 		supplier = frappe.get_doc({
@@ -33,8 +33,10 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 			"default_currency" : qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else '',
 		}).insert()
 
-		# if supplier and qb_supplier.get('BillAddr'):
-		# 	create_supplier_address(supplier, qb_supplier.get("BillAddr"))
+		if supplier and supplier.get('BillAddr'):
+			create_supplier_address(qb_supplier, supplier, qb_supplier.get("BillAddr"), "Billing", 1)
+		if supplier and supplier.get('ShipAddr'):
+			create_supplier_address(qb_supplier, supplier, qb_supplier.get("ShipAddr"), "Shipping", 2)
 		frappe.db.commit()
 		quickbooks_supplier_list.append(supplier.quickbooks_supp_id)
 
@@ -46,22 +48,26 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 				request_data=qb_supplier, exception=True)
 	return quickbooks_supplier_list
 
-def create_supplier_address(supplier, address):
-	address_title, address_type = get_address_title_and_type(supplier.supplier_name)
+def create_supplier_address(qb_supplier, supplier, address, type_of_address, index):
+	address_title, address_type = get_address_title_and_type(supplier.supplier_name, type_of_address, index)
+	qb_id = str(address.get("Id")) + str(address_type)
+	print address
 	try :
 		frappe.get_doc({
 			"doctype": "Address",
-			"quickbooks_address_id": address.get("Id"),
+			"quickbooks_address_id": qb_id,
 			"address_title": address_title,
 			"address_type": address_type,
-			"address_line1": address.get("Line1"),
-			"city": address.get("City"),
+			"address_line1": address.get("Line1")[:35] or _("address_line 1"),
+			"address_line2": address.get("Line1")[36:70] or _("address_line 2"),
+			"city": address.get("City") or _("City"),
 			"state": address.get("CountrySubDivisionCode"),
 			"pincode": address.get("PostalCode"),
-			"country": frappe.db.get_value("Country",{"code":address.get("CountrySubDivisionCode")},"name"),
-			"email_id": address.get("PrimaryEmailAddr"),
+			"country": address.get("CountrySubDivisionCode") or _('India'),
+			"email_id": qb_supplier.get('PrimaryEmailAddr').get('Address') if qb_supplier.get('PrimaryEmailAddr') else '',
+			"phone" : qb_supplier.get('Mobile').get('FreeFormNumber') if qb_supplier.get('Mobile') else '',
 			"supplier": supplier.name,
-			"supplier_name":  supplier.supplier_name
+			"supplier_name":  supplier.customer_name
 		}).insert()
 			
 	except Exception, e:
@@ -69,13 +75,13 @@ def create_supplier_address(supplier, address):
 				request_data=address, exception=True)
 		raise e
 	
-def get_address_title_and_type(supplier_name):
-	address_type = _("Billing")
+def get_address_title_and_type(supplier_name, type_of_address, index):
+	address_type = _(type_of_address)
 	address_title = supplier_name
 	if frappe.db.get_value("Address", "{0}-{1}".format(supplier_name.strip(), address_type)):
-		address_title = "{0}".format(supplier_name.strip())
+		address_title = "{0}-{1}".format(supplier_name.strip(), index)
 		
-	return address_title, address_type 
+	return address_title, address_type  
 
 
 """Sync Supplier From Erpnext to Quickbooks"""

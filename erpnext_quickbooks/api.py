@@ -17,6 +17,9 @@ from .sync_purchase_invoice import *
 from .sync_journal_vouchers import *
 from .sync_entries import *
 from .sync_account import *
+from .sync_taxcode import *
+from .sync_taxagency import *
+from .sync_taxrate import *
 
 
 QUICKBOOKS_CLIENT_KEY = ""
@@ -88,6 +91,7 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	global request_token_secret
 	global QUICKBOOKS_CLIENT_KEY
 	global QUICKBOOKS_CLIENT_SECRET
+	
 	realm_id =quickbooks_settings.realm_id
 	access_token =quickbooks_settings.access_token
 	access_token_secret = quickbooks_settings.access_token_secret
@@ -102,6 +106,9 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	    company_id=quickbooks_settings.realm_id
 	)
 	frappe.db.set_value("Quickbooks Settings", None, "last_sync_datetime", frappe.utils.now())
+	sync_taxagency(quickbooks_obj)
+	sync_tax_code(quickbooks_obj)
+	sync_tax_rate(quickbooks_obj)
 	sync_customers(quickbooks_obj)
 	sync_suppliers(quickbooks_obj)
 	create_Employee(quickbooks_obj)
@@ -109,10 +116,12 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	sync_Account(quickbooks_obj)
 	sync_si_orders(quickbooks_obj)
 	sync_pi_orders(quickbooks_obj)
+	#print "data-----"
 
 	payment_invoice(quickbooks_obj)
 	bill_payment(quickbooks_obj)
 	sync_entry(quickbooks_obj)
+
 
 def validate_quickbooks_settings(quickbooks_settings):
 	"""
@@ -135,10 +144,11 @@ def sync_from_erp_to_quickbooks(quickbooks_settings):
 	    access_token_secret=quickbooks_settings.access_token_secret,
 	    company_id=quickbooks_settings.realm_id
 	)
-	sync_erp_customers(quickbooks_obj)
-	sync_erp_suppliers(quickbooks_obj)
+	# sync_erp_customers(quickbooks_obj)
+	# sync_erp_suppliers(quickbooks_obj)
 	# sync_erp_employees()
-	sync_erp_accounts(quickbooks_obj)
+	# sync_erp_accounts(quickbooks_obj)
 	# sync_erp_items()
-	sync_erp_sales_invoices(quickbooks_obj)
+	# sync_erp_sales_invoices(quickbooks_obj)
 	# sync_erp_purchase_invoices()
+	# sync_erp_sales_taxes() 

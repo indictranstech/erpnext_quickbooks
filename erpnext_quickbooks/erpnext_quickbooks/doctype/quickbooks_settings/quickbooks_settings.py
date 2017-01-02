@@ -5,7 +5,7 @@
 from __future__ import unicode_literals
 import frappe
 from frappe.model.document import Document
-from frappe import _,msgprint
+from frappe import _, msgprint
 from frappe.utils import cstr, flt, cint, get_files_path
 import httplib
 import urllib3
@@ -69,10 +69,12 @@ def quickbooks_authentication_popup(consumer_key, consumer_secret):
            consumer_secret = quickbooks_settings.consumer_secret,
            callback_url = 'http://'+ frappe.request.host + '/api/method/erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.First_callback'
     )
-
-	quickbooks_settings.authorize_url = quickbooks.get_authorize_url()
-	quickbooks_settings.request_token = quickbooks.request_token
-	quickbooks_settings.request_token_secret = quickbooks.request_token_secret
-	quickbooks_settings.save()
-	frappe.db.commit()
+	try:
+		quickbooks_settings.authorize_url = quickbooks.get_authorize_url()
+		quickbooks_settings.request_token = quickbooks.request_token
+		quickbooks_settings.request_token_secret = quickbooks.request_token_secret
+		quickbooks_settings.save()
+		frappe.db.commit()
+	except Exception, e:
+		frappe.throw(_("HTTPSConnection Error Please Connect to Internet"))
 	return quickbooks_settings.authorize_url
