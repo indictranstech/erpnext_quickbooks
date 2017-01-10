@@ -53,7 +53,9 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 		pi = frappe.get_doc({
 			"doctype": "Purchase Invoice",
 			"quickbooks_purchase_invoice_id" : qb_orders.get("Id"),
-			"naming_series": "PI-Quickbooks-",
+			"naming_series": "PINV-",
+			"quickbooks_bill_no": qb_orders.get("DocNumber"),
+			"title" : frappe.db.get_value("Supplier",{"quickbooks_supp_id":qb_orders['VendorRef'].get('value')},"name"),
 			"supplier": frappe.db.get_value("Supplier",{"quickbooks_supp_id":qb_orders['VendorRef'].get('value')},"name"),
 			"posting_date": qb_orders.get('TxnDate'),
 			"buying_price_list": quickbooks_settings.buying_price_list,
@@ -71,8 +73,8 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 
 def get_order_items(order_items, quickbooks_settings):
 	"""Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks"""
- 	print order_items
- 	print "\n\n"
+ 	# print order_items
+ 	# print "\n\n"
  	items = []
  	for qb_item in order_items:
  		"""Get all the Items details from PI(bill)"""
@@ -90,9 +92,9 @@ def get_order_items(order_items, quickbooks_settings):
 		else:
 		 	"""Get all Account details from PI(bill)"""
 		 	quickbooks_account_reference = qb_item.get('AccountBasedExpenseLineDetail').get('AccountRef').get('value')
-		 	print  quickbooks_account_reference, "----------"
+		 	# print  quickbooks_account_reference, "----------"
 		 	quickbooks_account = frappe.db.get_value("Account", {"quickbooks_account_id" : quickbooks_account_reference}, "name")
-		 	print quickbooks_account,"quickbooks_account"
+		 	# print quickbooks_account,"quickbooks_account"
 		 	items.append({
 				"item_name": quickbooks_account if quickbooks_account else  qb_item.get('Description')[:35],
 				"description":qb_item.get('Description') + _(" Service Item") if qb_item.get('Description') else quickbooks_account,
@@ -101,7 +103,7 @@ def get_order_items(order_items, quickbooks_settings):
 				"expense_account": quickbooks_account,
 				"stock_uom": _("Nos")			
 			})
-	print items,"items-----------"		
+	# print items,"items-----------"		
 	return items
 
 def get_item_code(qb_item):
@@ -186,7 +188,7 @@ def sync_erp_purchase_invoices_to_quickbooks():
 
 def erp_purchase_invoice_data():
 	"""ERPNext Invoices Record"""
-	erp_purchase_invoice = frappe.db.sql("""SELECT `name`,`supplier_name`,DATE_FORMAT(due_date,'%d-%m-%Y') as due_date, DATE_FORMAT(posting_date,'%d-%m-%Y') as posting_date from  `tabPurchase Invoice` where `quickbooks_purchase_invoice_id` is NULL and docstatus = 1""" ,as_dict=1)
+	erp_purchase_invoice = frappe.db.sql("""SELECT `name`,`supplier_name`, taxes_and_charges, DATE_FORMAT(due_date,'%d-%m-%Y') as due_date, DATE_FORMAT(posting_date,'%d-%m-%Y') as posting_date from  `tabPurchase Invoice` where `quickbooks_purchase_invoice_id` is NULL and docstatus = 1""" ,as_dict=1)
 	return erp_purchase_invoice
 
 def erp_purchase_invoice_item_data(purchase_invoice_name):
@@ -200,6 +202,10 @@ def create_erp_purchase_invoice_to_quickbooks(erp_purchase_invoice, Purchase_inv
 	purchase_invoice_obj.DueDate = erp_purchase_invoice.due_date
 	purchase_invoice_obj.TxnDate =  erp_purchase_invoice.posting_date
 	Vendor_ref(purchase_invoice_obj, erp_purchase_invoice)
+	if erp_purchase_invoice.get('taxes_and_charges'):
+		purchase_invoice_obj.GlobalTaxCalculation = "TaxExcluded"
+	else:
+		purchase_invoice_obj.GlobalTaxCalculation = "NotApplicable"
 	purchase_invoice_item(purchase_invoice_obj, erp_purchase_invoice)
   	Vendor_ref(purchase_invoice_obj, erp_purchase_invoice)
 	purchase_invoice_obj.save()
@@ -225,6 +231,7 @@ def purchase_invoice_item(purchase_invoice_obj, erp_purchase_invoice):
 		line.ItemBasedExpenseLineDetail.BillableStatus = "NotBillable"
 		line.ItemBasedExpenseLineDetail.Qty = purchase_invoice_item.qty
 		line.ItemBasedExpenseLineDetail.UnitPrice = purchase_invoice_item.rate
+		line.ItemBasedExpenseLineDetail.TaxCodeRef = TaxCodeRef(erp_purchase_invoice)
 		purchase_invoice_obj.Line.append(line)
 
 
@@ -233,3 +240,9 @@ def purchase_item_ref(purchase_invoice_item):
 	item_reference.name = purchase_invoice_item.get('item_code')
 	item_reference.value = frappe.db.get_value("Item", {"name": purchase_invoice_item.get('item_code')}, "quickbooks_item_id")
 	return item_reference
+
+def TaxCodeRef(erp_purchase_invoice):
+	# quickbooks_purchase_tax_id = frappe.db.get_value("Purchase Taxes and Charges Template", {"name": erp_purchase_invoice.get('taxes_and_charges')}, "quickbooks_purchase_tax_id")
+	# print quickbooks_purchase_tax_id,""
+	# return {"value": quickbooks_purchase_tax_id}
+	return {"value": "11"}

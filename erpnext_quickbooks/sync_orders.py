@@ -1,7 +1,8 @@
 from __future__ import unicode_literals
 import frappe
 from frappe import _
-from frappe.utils import flt, nowdate
+import json
+from frappe.utils import flt, cstr, nowdate
 import requests.exceptions
 from .utils import make_quickbooks_log
 from pyqb.quickbooks.batch import batch_create, batch_delete
@@ -51,7 +52,9 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 		si = frappe.get_doc({
 			"doctype": "Sales Invoice",
 			"quickbooks_invoce_id" : qb_orders.get("Id"),
-			"naming_series": "SI-Quickbooks-",
+			"naming_series": "SINV-",
+			"quickbooks_invoice_no" : qb_orders.get("DocNumber"),
+			"title": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
 			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
 			"posting_date": qb_orders.get('TxnDate'),
 			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory"),
@@ -59,7 +62,7 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
 			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
-			"taxes": get_order_taxes(qb_orders)
+			"taxes": get_individual_item_tax(qb_orders['Line'], quickbooks_settings)
 		})
 		si.flags.ignore_mandatory = True
 		si.save(ignore_permissions=True)
@@ -68,10 +71,31 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 		frappe.db.commit()	
 	return quickbooks_invoice_list
 
+def get_individual_item_tax(order_items, quickbooks_settings):
+	"""tax break for individual item from QuickBooks"""
+	taxes = []
+	Default_company = frappe.defaults.get_defaults().get("company")
+	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
+	tax_amount = 0
+	for i in get_order_items(order_items, quickbooks_settings):
+		if i['quickbooks__tax_code_value']:
+			tax_amount = flt(tax_amount) + (flt(i['quickbooks__tax_code_value']) * (i['qty'] *i['rate']))/100
+	if tax_amount:
+		taxes.append({
+				"charge_type": _("On Net Total"),
+				"account_head": get_tax_account_head(),
+				"description": _("Total Tax added from invoice"),
+				"rate": 0,
+				"tax_amount": tax_amount
+				})
+	return taxes
+
+
 def get_order_items(order_items, quickbooks_settings):
  	items = []
-	for qb_item in order_items:
+ 	for qb_item in order_items:
 		if qb_item.get('SalesItemLineDetail'):
+		 	item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = tax_code_ref(qb_item)
 			item_code = get_item_code(qb_item)
 			items.append({
 				"item_code": item_code if item_code else '',
@@ -80,9 +104,27 @@ def get_order_items(order_items, quickbooks_settings):
 				"rate": qb_item.get('SalesItemLineDetail').get('UnitPrice') if qb_item.get('SalesItemLineDetail').get('UnitPrice') else qb_item.get('Amount'),
 				"qty": qb_item.get('SalesItemLineDetail').get('Qty') if qb_item.get('SalesItemLineDetail').get('Qty') else 1,
 				"income_account": quickbooks_settings.cash_bank_account,
-				"stock_uom": _("Nos")			
+				"stock_uom": _("Nos"),
+				"item_tax_rate": '{0}'.format(json.dumps(item_tax_rate)),
+				"quickbooks_tax_code_ref": quickbooks_tax_code_ref,
+				"quickbooks__tax_code_value": quickbooks__tax_code_value
 			})
 	return items
+
+def tax_code_ref(qb_item):
+	# print qb_item.get('SalesItemLineDetail'), "gggggggggggggggggggggggg"
+	item_wise_tax ={}
+	individual_item_tax = ''
+	if qb_item.get('SalesItemLineDetail').get('TaxCodeRef'):
+		tax_code_id1 = qb_item.get('SalesItemLineDetail').get('TaxCodeRef').get('value') if qb_item.get('SalesItemLineDetail') else ''
+		individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
+						from 
+							`tabQuickBooks TaxRate` as qbr,
+							(select * from `tabQuickBooks SalesTaxRateList` where parent = {0}) as qbs 
+						where 
+							qbr.name = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
+		item_wise_tax[cstr(get_tax_account_head())] = flt(individual_item_tax[0]['tax_percent'])
+	return item_wise_tax, cstr(individual_item_tax[0]['tax_head']) if individual_item_tax else '', flt(individual_item_tax[0]['tax_percent']) if individual_item_tax else 0
 
 def get_item_code(qb_item):
 	#item_code = frappe.db.get_value("Item", {"quickbooks_variant_id": qb_item.get("variant_id")}, "item_code")
@@ -104,19 +146,7 @@ def get_order_taxes(qb_orders):
 				"account_head": get_tax_account_head(),
 				"description": _("Total Tax added from invoice"),
 				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
-				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
 			})
-			
-		# else:
-		# 	for tax in qb_orders['TxnTaxDetail']['TaxLine']:
-		# 			taxes.append({
-		# 				"charge_type": _("On Net Total"),
-		# 				"account_head": "Commission on Sales - ES",#get_tax_account_head(tax),
-		# 				"description": "{0} - {1}%".format(tax.get("title"), tax.get("rate") * 100.0),
-		# 				"rate": tax.get("rate") * 100.00
-		# 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
-		# 			})
-			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
 	return taxes
 
 
@@ -126,7 +156,7 @@ def get_tax_account_head():
 		{"parent": "Quickbooks Settings"}, "tax_account")
 
 	if not tax_account:
-		frappe.throw("Tax Account not specified for Shopify Tax ")
+		frappe.throw("Tax Account not specified for QuickBooks Tax ")
 
 	return tax_account
 
@@ -174,7 +204,7 @@ def sync_erp_sales_invoices_to_quickbooks(quickbooks_obj):
 
 def erp_sales_invoice_data():
 	"""ERPNext Invoices Record"""
-	erp_sales_invoice = frappe.db.sql("""select `name` ,`customer_name` from  `tabSales Invoice` where `quickbooks_invoce_id` is NULL and is_pos is FALSE and docstatus = 1""" ,as_dict=1)
+	erp_sales_invoice = frappe.db.sql("""select `name` ,`customer_name`, `taxes_and_charges` from  `tabSales Invoice` where `quickbooks_invoce_id` is NULL and is_pos is FALSE and docstatus = 1""" ,as_dict=1)
 	return erp_sales_invoice
 
 def erp_sales_invoice_item_data(invoice_name):
@@ -187,7 +217,10 @@ def create_erp_sales_invoice_to_quickbooks(erp_sales_invoice, Sales_invoice_list
 	sales_invoice_obj.DocNumber = erp_sales_invoice.name
 	sales_invoice_item(sales_invoice_obj, erp_sales_invoice)
 	customer_ref(sales_invoice_obj, erp_sales_invoice)
-	sales_invoice_obj.GlobalTaxCalculation = "NotApplicable"
+	if erp_sales_invoice.get('taxes_and_charges'):
+		sales_invoice_obj.GlobalTaxCalculation = "TaxExcluded"
+	else:
+		sales_invoice_obj.GlobalTaxCalculation = "NotApplicable"
 	sales_invoice_obj.save()
 	Sales_invoice_list.append(sales_invoice_obj)
 	return Sales_invoice_list		
@@ -207,8 +240,15 @@ def sales_invoice_item(sales_invoice_obj, erp_sales_invoice):
 		line.SalesItemLineDetail.ItemRef = item_ref(invoice_item) 
 		line.SalesItemLineDetail.Qty = invoice_item.qty
 		line.SalesItemLineDetail.UnitPrice =invoice_item.rate
+		line.SalesItemLineDetail.TaxCodeRef = TaxCodeRef(erp_sales_invoice)
 		sales_invoice_obj.Line.append(line)
 		
 def item_ref(invoice_item):
 	quickbooks_item_id = frappe.db.get_value("Item", {"name": invoice_item.get('item_code')}, "quickbooks_item_id")
 	return {"value": quickbooks_item_id, "name": invoice_item.get('item_code')}
+
+def TaxCodeRef(erp_sales_invoice):
+	quickbooks_sales_tax_id = frappe.db.get_value("Sales Taxes and Charges Template", {"name": erp_sales_invoice.get('taxes_and_charges')}, "quickbooks_sales_tax_id")
+	# print quickbooks_sales_tax_id,""
+	# return {"value": quickbooks_sales_tax_id}
+	return {"value": "11"}

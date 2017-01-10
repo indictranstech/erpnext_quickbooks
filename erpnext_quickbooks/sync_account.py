@@ -3,55 +3,65 @@ import frappe
 from frappe import _
 import frappe.defaults
 import requests.exceptions
-from .utils import make_quickbooks_log
+from .utils import make_quickbooks_log, pagination
 from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.account import Account 
 
 
-def Query_limit(quickbooks_obj):
-	quickbook_account = []
-	record_count = quickbooks_obj.query("""SELECT count(*) from Account""")
-	total_record = record_count['QueryResponse']['totalCount']
-	limit_count = 90
-	total_page = total_record / limit_count
-	STARTPOSITION,MAXRESULTS = 0,0  
-	for i in range(total_page + 1):
-		MAXRESULTS = STARTPOSITION + limit_count
-		account_query = """SELECT Name, Active, Classification, AccountType, AccountSubType, CurrencyRef, Id FROM Account ORDER BY Id Desc STARTPOSITION {0} MAXRESULTS {1} """.format(STARTPOSITION, MAXRESULTS)
-		fetch_item_qb = quickbooks_obj.query(account_query)
-		qb_account =  fetch_item_qb['QueryResponse']
-		if qb_account:
-			quickbook_account.extend(qb_account['Account'])
-		STARTPOSITION = STARTPOSITION + limit_count
-	return quickbook_account
+# def Query_limit(quickbooks_obj):
+# 	quickbook_account = []
+# 	record_count = quickbooks_obj.query("""SELECT count(*) from Account""")
+# 	total_record = record_count['QueryResponse']['totalCount']
+# 	limit_count = 90
+# 	total_page = total_record / limit_count
+# 	STARTPOSITION,MAXRESULTS = 0,0  
+# 	for i in range(total_page + 1):
+# 		MAXRESULTS = STARTPOSITION + limit_count
+# 		account_query = """SELECT Name, Active, Classification, AccountType, AccountSubType, CurrencyRef, Id FROM Account ORDER BY Id Desc STARTPOSITION {0} MAXRESULTS {1} """.format(STARTPOSITION, MAXRESULTS)
+# 		fetch_item_qb = quickbooks_obj.query(account_query)
+# 		qb_account =  fetch_item_qb['QueryResponse']
+# 		if qb_account:
+# 			quickbook_account.extend(qb_account['Account'])
+# 		STARTPOSITION = STARTPOSITION + limit_count
+# 	return quickbook_account
 
-"""Code to fetch all the Account from Quickbooks And store it in ERPNEXT"""
+# """Code to fetch all the Account from Quickbooks And store it in ERPNEXT"""
+# def sync_Account(quickbooks_obj):
+# 	"""Fetch Account data from QuickBooks"""
+# 	quickbooks_account_list = []
+# 	get_qb_account = Query_limit(quickbooks_obj)
+# 	sync_qb_accounts(get_qb_account,quickbooks_account_list)
+
 def sync_Account(quickbooks_obj):
 	"""Fetch Account data from QuickBooks"""
 	quickbooks_account_list = []
-	get_qb_account = Query_limit(quickbooks_obj)
-	sync_qb_accounts(get_qb_account,quickbooks_account_list)
-
+	business_objects = "Account"
+	get_qb_account = pagination(quickbooks_obj, business_objects)
+	if get_qb_account:
+		print get_qb_account,"0000000000000000000"
+		sync_qb_accounts(get_qb_account, quickbooks_account_list)
 
 def sync_qb_accounts(get_qb_account, quickbooks_account_list):
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	Company_abbr = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "abbr")
 	for qb_account in get_qb_account:
-		if not frappe.db.get_value("Account", {"quickbooks_account_id": qb_account.get('Id')}, "name"):
-			create_account(qb_account, quickbooks_account_list)
+		if not frappe.db.get_value("Account", {"quickbooks_account_id": qb_account.get('Id'), "company": quickbooks_settings.select_company}, "name"):
+			create_account(qb_account, quickbooks_account_list, quickbooks_settings, Company_abbr)
 
-def create_account(qb_account, quickbooks_account_list):
+def create_account(qb_account, quickbooks_account_list, quickbooks_settings, Company_abbr):
 	""" store Account data in ERPNEXT """ 
 	account = None
 	account_type = None
 	root_type = None
 	parent_account = None
-	Default_company = frappe.defaults.get_defaults().get("company")
-	Company_abbr = frappe.db.get_value("Company", {"name": Default_company}, "abbr")
+	# Default_company = frappe.defaults.get_defaults().get("company")
+	# Company_abbr = frappe.db.get_value("Company", {"name": Default_company}, "abbr")
 	
-	"company wise chart of accounts"
-	if Default_company == 'Singapore':
-		parent_account, root_type  = accounts_mapper_for_singapore(qb_account, Company_abbr)
-	else:
-		parent_account, root_type  = account_mapper_for_all_country(qb_account, Company_abbr)
+	# if Default_company == 'Singapore':
+	# 	parent_account, root_type  = accounts_mapper_for_singapore(qb_account, Company_abbr)
+	# else:
+	# 	parent_account, root_type  = account_mapper_for_all_country(qb_account, Company_abbr)
+	parent_account, root_type  = account_mapper_all_country(qb_account, Company_abbr)
 	
 	try:	
 		account = frappe.new_doc("Account")
@@ -61,6 +71,7 @@ def create_account(qb_account, quickbooks_account_list):
 		account.parent_account = parent_account
 		account.root_type = root_type
 		account.account_currency = qb_account.get('CurrencyRef').get('value')
+		account.company = quickbooks_settings.select_company
 		account.flags.ignore_mandatory = True
 		account.insert()
 
@@ -75,6 +86,129 @@ def create_account(qb_account, quickbooks_account_list):
 				request_data=qb_account, exception=True)
 	
 	return quickbooks_account_list
+
+def quickbooks_accounts_head(quickbooks_settings):
+
+	chart_of_accounts = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "chart_of_accounts")
+	if chart_of_accounts == "Singapore - F&B Chart of Accounts" or chart_of_accounts == "Singapore - Chart of Accounts":
+		category_type = {'Asset, Assets':['Fixed assets','Non-current assets','Accounts receivables (Debtors)','Current assets', 'Bank'],\
+					'Liability, Liabilities':['Accounts payables (Creditors)', 'Non-current liabilities', 'Current liabilities', 'Credit Cards'],\
+					'Income, Income':['Other Income'],\
+					'Expense, Expenses':['Other Expense','Cost of Goods Sold']}
+	else:
+		category_type = {'Asset, Application of Funds (Assets)':['Fixed assets','Non-current assets','Accounts receivables (Debtors)','Current assets', 'Bank'],\
+					'Liability, Source of Funds (Liabilities)':['Accounts payables (Creditors)', 'Non-current liabilities', 'Current liabilities', 'Credit Cards'],\
+					'Income, Income':['Other Income'],\
+					'Expense, Expenses':['Other Expense','Cost of Goods Sold']}
+	return category_type
+
+
+def delete_chart_of_accounts(quickbooks_settings, Company_abbr):
+	# quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	# Company_abbr = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "abbr")
+	frappe.db.sql("""Delete from `tabAccount` 
+		where is_group =0 
+		and company = '{0}'
+		and name not in('Creditors - {1}', 'Cash - {1}', 'Cost of Goods Sold - {1}', 'Debtors - {1}', 
+			'Sales - {1}', 'Rounded Off - {1}', 'Main - {1}', 'Main - {1}', 'Stock Received But Not Billed - {1}', 
+			'Expenses Included In Valuation - {1}', 'Stock Adjustment - {1}', 'Accumulated Depreciation - {1}', 
+			'Depreciation - {1}','Main - {1}','Finished Goods - {1}','Stores - {1}','Work In Progress - {1}', 
+			'Marketing Expenses - {1}', 'Round Off - {1}', 'Cash in Transit - {1}', 'Paypal Account - {1}')
+		""" .format(quickbooks_settings.select_company, Company_abbr))
+	frappe.db.sql("""Delete from `tabAccount` 
+		where is_group =1 
+		and company = '{0}'
+		and name in('Indirect Income - {1}', 'Tax Assets - {1}','Securities and Deposits - {1}', 'Fixed Assets - {1}',
+		 'Loans (Liabilities) - {1}', 'Duties and Taxes - {1}', 'Indirect Income - {1}', 'Bank Accounts - {1}', 
+		 'Loans and Advances (Assets) - {1}', 'Investments - {1}', 'Temporary Accounts - {1}', 'Salaries - {1}',
+		 'Bonuses - {1}', 'Expenses-Staff - {1}', 'Tax Expenses - {1}', 'Depreciation - {1}', 'Expenses-Other - {1}',
+		 'Utilities - {1}', 'Subscription Fees - {1}', 'Repairs and Maintenance - {1}', 'Rental Costs - {1}',
+		 'Communication Costs - {1}', 'Commission Charges - {1}', 'Expenses-Operating - {1}', 'Expenses-Marketing - {1}',
+		 'Expenses-Administrative - {1}' , 'Interest Income - {1}', 'Non-current liabilities - {1}',
+		 'Provision and Accruals - {1}', 'Loans-Current - {1}', 'Duties and Taxes - {1}', 'Capital Account - {1}', 'Temporary Accunts - {1}',
+		 "Shares - {1}", 'Investments - {1}', 'Securities and Deposits - {1}', 'Loans and Advances-Assets - {1}'
+		 )
+		""" .format(quickbooks_settings.select_company, Company_abbr))
+
+	
+def creates_qb_accounts_heads_to_erp_chart_of_accounts():
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	Company_abbr = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "abbr")
+	delete_chart_of_accounts(quickbooks_settings, Company_abbr)
+	for root_type, account_names  in quickbooks_accounts_head(quickbooks_settings).items():
+		for account_name in account_names:
+			if not frappe.db.get_value("Account", {"quickbooks_account_id": "Quickbooks_catagory", "name": account_name + " - qb - " + Company_abbr}, "name"):
+				try:	
+					qb_category_type = frappe.new_doc("Account")
+					qb_category_type.quickbooks_account_id = "Quickbooks_catagory"
+					qb_category_type.account_name = account_name + " - " + "qb"
+					qb_category_type.is_group = True
+					qb_category_type.parent_account = root_type.split(",")[1].strip() + " - " + Company_abbr
+					qb_category_type.root_type = root_type.split(",")[0]
+					qb_category_type.company = quickbooks_settings.select_company
+					qb_category_type.flags.ignore_mandatory = True
+					qb_category_type.insert()
+					frappe.db.commit()
+				except Exception, e:
+					if e.args[0] and e.args[0].startswith("402"):
+						raise e
+					else:
+						make_quickbooks_log(title=e.message, status="Error", method="creates_qb_accounts_heads_to_erp_chart_of_accounts", message=frappe.get_traceback(),
+							request_data=account_names, exception=True)
+
+
+def account_mapper_all_country(qb_account, Company_abbr):
+	if qb_account.get('AccountType') == "Fixed Asset":
+		parent_account = _("Fixed assets") + " - " + 'qb' + " - " + Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Other Current Asset":
+		parent_account = _("Current assets") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Bank":
+		parent_account = _("Bank") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Other Asset":
+		parent_account = _("Non-current assets") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Accounts Receivable":
+		parent_account = _("Accounts receivables (Debtors)") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Asset")
+	elif qb_account.get('AccountType') == "Accounts Payable":
+		parent_account = _("Accounts payables (Creditors)") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Liability")
+	elif qb_account.get('AccountType') == 'Other Current Liability':
+		parent_account = _("Non-current liabilities") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Liability")
+	elif qb_account.get('AccountType') == 'Long Term Liability':
+		parent_account = _("Current liabilities") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Liability")
+	elif qb_account.get('AccountType') == 'Credit Card':
+		parent_account = _("Credit Cards") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Liability")
+	elif qb_account.get("AccountType") == "Equity":
+		parent_account = _("Equity") + " - " + Company_abbr
+		root_type = _("Equity")
+	elif qb_account.get('AccountType') == 'Income':
+		parent_account = _("Direct Income") + " - " + Company_abbr
+		root_type = _("Income")
+	elif qb_account.get('AccountType') == 'Other Income':
+		parent_account = _("Other Income") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Income")
+	elif qb_account.get('AccountType') == 'Expense':
+		parent_account = _("Expenses") + " - " + Company_abbr
+		root_type = _("Expense")
+	elif qb_account.get('AccountType') == 'Other Expense':
+		parent_account = _("Other Expense") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Expense")
+	elif qb_account.get('AccountType') == 'Cost of Goods Sold':
+		parent_account = _("Cost of Goods Sold") + " - " + 'qb' + " - " +  Company_abbr
+		root_type = _("Expense")
+	return parent_account, root_type 
+
+
+
+
+
 
 def account_mapper_for_all_country(qb_account, Company_abbr):
 	if qb_account.get('AccountType') == "Fixed Asset":
