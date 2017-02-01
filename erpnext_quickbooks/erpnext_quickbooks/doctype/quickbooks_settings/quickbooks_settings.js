@@ -74,7 +74,7 @@ pop_up_window = function(url,windowName) {
 cur_frm.cscript.sync_quickbooks_accounts = function(frm) {
 	var me = this;
 	// alert("something")
-	if(!cur_frm.doc.__islocal && cur_frm.doc.enable_quickbooks_online=== 1 && cur_frm.doc.authorize_url) {
+	if(!cur_frm.doc.__islocal && cur_frm.doc.enable_quickbooks_online=== 1 && cur_frm.doc.authorize_url && cur_frm.doc.select_company) {
 		return frappe.call({
 				method: "erpnext_quickbooks.api.sync_account_masters",
 				freeze: true,
