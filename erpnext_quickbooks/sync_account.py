@@ -38,7 +38,7 @@ def sync_Account(quickbooks_obj):
 	business_objects = "Account"
 	get_qb_account = pagination(quickbooks_obj, business_objects)
 	if get_qb_account:
-		print get_qb_account,"0000000000000000000"
+		# print get_qb_account,"0000000000000000000"
 		sync_qb_accounts(get_qb_account, quickbooks_account_list)
 
 def sync_qb_accounts(get_qb_account, quickbooks_account_list):
@@ -134,7 +134,7 @@ def delete_chart_of_accounts(quickbooks_settings, Company_abbr):
 def creates_qb_accounts_heads_to_erp_chart_of_accounts():
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	Company_abbr = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "abbr")
-	delete_chart_of_accounts(quickbooks_settings, Company_abbr)
+	# delete_chart_of_accounts(quickbooks_settings, Company_abbr)
 	for root_type, account_names  in quickbooks_accounts_head(quickbooks_settings).items():
 		for account_name in account_names:
 			if not frappe.db.get_value("Account", {"quickbooks_account_id": "Quickbooks_catagory", "name": account_name + " - qb - " + Company_abbr}, "name"):
@@ -336,7 +336,8 @@ def sync_erp_accounts_to_quickbooks(quickbooks_obj):
 	return results
 
 def erp_account_data():
-	erp_account = frappe.db.sql("""select name, root_type, account_type, quickbooks_account_id from `tabAccount` where is_group =0 && quickbooks_account_id is NULL""" ,as_dict=1)
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	erp_account = frappe.db.sql("""select name, root_type, account_type, quickbooks_account_id from `tabAccount` where is_group =0 and company='{0}' and quickbooks_account_id is NULL""".format(quickbooks_settings.select_company) ,as_dict=1)
 	return erp_account
 
 def create_erp_account_to_quickbooks(erp_account, Account_list):

@@ -113,7 +113,7 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	sync_customers(quickbooks_obj)
 	sync_suppliers(quickbooks_obj)
 	create_Employee(quickbooks_obj)
-	create_Item(quickbooks_obj)
+	sync_items(quickbooks_obj)
 	sync_Account(quickbooks_obj)
 	sync_si_orders(quickbooks_obj)
 	sync_pi_orders(quickbooks_obj)

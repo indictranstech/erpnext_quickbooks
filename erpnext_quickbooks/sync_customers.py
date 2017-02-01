@@ -33,7 +33,9 @@ def create_customer(qb_customer, quickbooks_customer_list):
 			"customer_group" : _("Commercial"),
 			"default_currency" : qb_customer['CurrencyRef'].get('value','') if qb_customer.get('CurrencyRef') else '',
 			"territory" : _("All Territories"),
-		}).insert()
+		})
+		customer.flags.ignore_mandatory = True
+		customer.insert()
 		
 		if customer and qb_customer.get('BillAddr'):
 			create_customer_address(qb_customer, customer, qb_customer.get("BillAddr"), "Billing", 1)
@@ -57,22 +59,24 @@ def create_customer_address(qb_customer, customer, address, type_of_address, ind
 	address_title, address_type = get_address_title_and_type(customer.customer_name, type_of_address, index)
 	qb_id = str(address.get("Id")) + str(address_type)
 	try :
-		frappe.get_doc({
+		customer_address = frappe.get_doc({
 			"doctype": "Address",
 			"quickbooks_address_id": qb_id,
 			"address_title": address_title,
 			"address_type": address_type,
-			"address_line1": address.get("Line1")[:35] or _("address_line 1"),
-			"address_line2": address.get("Line1")[36:70] or _("address_line 2"),
-			"city": address.get("City") or _("City"),
+			"address_line1": address.get("Line1")[:35],
+			"address_line2": address.get("Line1")[36:70],
+			"city": address.get("City"),
 			"state": address.get("CountrySubDivisionCode"),
 			"pincode": address.get("PostalCode"),
-			"country": address.get("CountrySubDivisionCode") or _('India'),
+			"country": address.get("Country"),
 			"email_id": qb_customer.get('PrimaryEmailAddr').get('Address') if qb_customer.get('PrimaryEmailAddr') else '',
 			"phone" : qb_customer.get('Mobile').get('FreeFormNumber') if qb_customer.get('Mobile') else '',
 			"customer": customer.name,
 			"customer_name":  customer.customer_name
-		}).insert()
+		})
+		customer_address.flags.ignore_mandatory = True
+		customer_address.insert()
 			
 	except Exception, e:
 		make_quickbooks_log(title=e.message, status="Error", method="create_customer_address", message=frappe.get_traceback(),

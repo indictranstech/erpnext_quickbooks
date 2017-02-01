@@ -17,6 +17,7 @@ def sync_suppliers(quickbooks_obj):
 
 	
 def sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list):
+	print get_qb_supplier," 00000000000000 "
 	for qb_supplier in get_qb_supplier:
 		if not frappe.db.get_value("Supplier", {"quickbooks_supp_id": qb_supplier.get('Id')}, "name"):
 			create_Supplier(qb_supplier, quickbooks_supplier_list)
@@ -31,12 +32,13 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 			"supplier_name" : str(qb_supplier.get('DisplayName')) if qb_supplier.get('DisplayName')  else str(qb_supplier.get('name')),
 			"supplier_type" :  _("Distributor"),
 			"default_currency" : qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else '',
-		}).insert()
+		})
+		supplier.flags.ignore_mandatory = True
+		supplier.insert()
 
-		if supplier and supplier.get('BillAddr'):
+		if supplier and qb_supplier.get('BillAddr'):
 			create_supplier_address(qb_supplier, supplier, qb_supplier.get("BillAddr"), "Billing", 1)
-		if supplier and supplier.get('ShipAddr'):
-			create_supplier_address(qb_supplier, supplier, qb_supplier.get("ShipAddr"), "Shipping", 2)
+		
 		frappe.db.commit()
 		quickbooks_supplier_list.append(supplier.quickbooks_supp_id)
 
@@ -51,24 +53,25 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 def create_supplier_address(qb_supplier, supplier, address, type_of_address, index):
 	address_title, address_type = get_address_title_and_type(supplier.supplier_name, type_of_address, index)
 	qb_id = str(address.get("Id")) + str(address_type)
-	print address
 	try :
-		frappe.get_doc({
+		supplier_address = frappe.get_doc({
 			"doctype": "Address",
 			"quickbooks_address_id": qb_id,
 			"address_title": address_title,
 			"address_type": address_type,
-			"address_line1": address.get("Line1")[:35] or _("address_line 1"),
-			"address_line2": address.get("Line1")[36:70] or _("address_line 2"),
-			"city": address.get("City") or _("City"),
+			"address_line1": address.get("Line1")[:35],
+			"address_line2": address.get("Line1")[36:70],
+			"city": address.get("City"),
 			"state": address.get("CountrySubDivisionCode"),
 			"pincode": address.get("PostalCode"),
-			"country": address.get("CountrySubDivisionCode") or _('India'),
+			"country": address.get("Country"),
 			"email_id": qb_supplier.get('PrimaryEmailAddr').get('Address') if qb_supplier.get('PrimaryEmailAddr') else '',
 			"phone" : qb_supplier.get('Mobile').get('FreeFormNumber') if qb_supplier.get('Mobile') else '',
 			"supplier": supplier.name,
-			"supplier_name":  supplier.customer_name
-		}).insert()
+			"supplier_name": supplier.name
+		})
+		supplier_address.flags.ignore_mandatory = True
+		supplier_address.insert()
 			
 	except Exception, e:
 		make_quickbooks_log(title=e.message, status="Error", method="create_supplier_address", message=frappe.get_traceback(),
