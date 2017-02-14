@@ -47,7 +47,11 @@ def create_order(qb_orders, quickbooks_invoice_list, company=None):
 	create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, company=None)
 
 def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, company=None):
-	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": qb_orders.get("Id")}, "name") 
+	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": qb_orders.get("Id")}, "name")
+	term_id = qb_orders.get('SalesTermRef').get('value') if qb_orders.get('SalesTermRef') else ""
+	term = ""
+	if term_id:
+		term = frappe.db.get_value("Terms and Conditions", {"quickbooks_term_id": term_id}, ["name","terms"],as_dict=1)
 	if not si:
 		si = frappe.get_doc({
 			"doctype": "Sales Invoice",
@@ -57,12 +61,16 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 			"title": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
 			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
 			"posting_date": qb_orders.get('TxnDate'),
+			"due_date": qb_orders.get('DueDate'),
 			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory"),
 			"selling_price_list": quickbooks_settings.selling_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
 			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
-			"taxes": get_individual_item_tax(qb_orders['Line'], quickbooks_settings)
+			"taxes": get_individual_item_tax(qb_orders['Line'], quickbooks_settings),
+			"tc_name": term.get('name') if term else "",
+			"terms": term.get('terms')if term else ""
+
 		})
 		si.flags.ignore_mandatory = True
 		si.save(ignore_permissions=True)
@@ -112,7 +120,6 @@ def get_order_items(order_items, quickbooks_settings):
 	return items
 
 def tax_code_ref(qb_item):
-	# print qb_item.get('SalesItemLineDetail'), "gggggggggggggggggggggggg"
 	item_wise_tax ={}
 	individual_item_tax = ''
 	if qb_item.get('SalesItemLineDetail').get('TaxCodeRef'):

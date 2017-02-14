@@ -20,6 +20,7 @@ from .sync_account import *
 from .sync_taxcode import *
 from .sync_taxagency import *
 from .sync_taxrate import *
+from .sync_term import *
 
 
 QUICKBOOKS_CLIENT_KEY = ""
@@ -112,6 +113,7 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	sync_tax_rate(quickbooks_obj)
 	sync_customers(quickbooks_obj)
 	sync_suppliers(quickbooks_obj)
+	sync_terms(quickbooks_obj)
 	create_Employee(quickbooks_obj)
 	sync_items(quickbooks_obj)
 	sync_Account(quickbooks_obj)

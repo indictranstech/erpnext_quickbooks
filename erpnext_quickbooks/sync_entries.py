@@ -46,14 +46,14 @@ def create_journal_entry_against_si(recived_payment):
 				si_je = frappe.get_doc(si_je)
 				si_je.quickbooks_journal_entry_id = qb_journal_entry_id
 				si_je.naming_series = "SI-JV-Quickbooks-"
-				si_je.cheque_no ="check no"
-				si_je.cheque_date =Transaction_date
+				si_je.voucher_type = _("Journal Entry")
+				# si_je.user_remark = recived_payment.get('PaymentRefNum') if recived_payment.get('PaymentRefNum') else ""
 				si_je.posting_date = Transaction_date
 				si_je.save()
 				si_je.submit()
 				frappe.db.commit()
 			else:
-				raise _("No Sales Invoice present ")
+				raise Exception(" No Sales Invoice present ")
 	except Exception, e:
 				if e.args[0] and e.args[0].startswith("402"):
 					raise e
@@ -99,14 +99,13 @@ def create_journal_entry_against_pi(made_payment):
 				pi_je = frappe.get_doc(pi_je)
 				pi_je.quickbooks_journal_entry_id = qb_journal_entry_id
 				pi_je.naming_series = "PI-JV-Quickbooks-"
-				pi_je.cheque_no ="Check no"
-				pi_je.cheque_date =Transaction_date
+				pi_je.voucher_type = _("Journal Entry")
 				pi_je.posting_date = Transaction_date
 				pi_je.save()
 				pi_je.submit()
 				frappe.db.commit()
 			else:
-				raise _("No Purchase Invoice present")
+				raise Exception("No Purchase Invoice present")
 	except Exception, e:
 				if e.args[0] and e.args[0].startswith("402"):
 					raise e

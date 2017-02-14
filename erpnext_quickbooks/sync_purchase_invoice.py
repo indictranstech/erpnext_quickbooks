@@ -49,6 +49,10 @@ def create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, c
 
 def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, company=None):
 	pi = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": qb_orders.get("Id")}, "name") 
+	term_id = qb_orders.get('SalesTermRef').get('value') if qb_orders.get('SalesTermRef') else ""
+	term = ""
+	if term_id:
+		term = frappe.db.get_value("Terms and Conditions", {"quickbooks_term_id": term_id}, ["name","terms"],as_dict=1)
 	if not pi:
 		pi = frappe.get_doc({
 			"doctype": "Purchase Invoice",
@@ -62,7 +66,9 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
 			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
-			"taxes": get_order_taxes(qb_orders)
+			"taxes": get_order_taxes(qb_orders),
+			"tc_name": term.get('name') if term else "",
+			"terms": term.get('terms')if term else ""
 		})
 		pi.flags.ignore_mandatory = True
 		pi.save(ignore_permissions=True)
@@ -73,9 +79,7 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 
 def get_order_items(order_items, quickbooks_settings):
 	"""Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks"""
- 	# print order_items
- 	# print "\n\n"
- 	items = []
+  	items = []
  	for qb_item in order_items:
  		"""Get all the Items details from PI(bill)"""
  		if qb_item.get('DetailType') == "ItemBasedExpenseLineDetail":
@@ -92,9 +96,7 @@ def get_order_items(order_items, quickbooks_settings):
 		else:
 		 	"""Get all Account details from PI(bill)"""
 		 	quickbooks_account_reference = qb_item.get('AccountBasedExpenseLineDetail').get('AccountRef').get('value')
-		 	# print  quickbooks_account_reference, "----------"
 		 	quickbooks_account = frappe.db.get_value("Account", {"quickbooks_account_id" : quickbooks_account_reference}, "name")
-		 	# print quickbooks_account,"quickbooks_account"
 		 	items.append({
 				"item_name": quickbooks_account if quickbooks_account else  qb_item.get('Description')[:35],
 				"description":qb_item.get('Description') + _(" Service Item") if qb_item.get('Description') else quickbooks_account,
@@ -103,7 +105,6 @@ def get_order_items(order_items, quickbooks_settings):
 				"expense_account": quickbooks_account,
 				"stock_uom": _("Nos")			
 			})
-	# print items,"items-----------"		
 	return items
 
 def get_item_code(qb_item):

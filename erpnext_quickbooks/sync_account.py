@@ -8,37 +8,12 @@ from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.account import Account 
 
 
-# def Query_limit(quickbooks_obj):
-# 	quickbook_account = []
-# 	record_count = quickbooks_obj.query("""SELECT count(*) from Account""")
-# 	total_record = record_count['QueryResponse']['totalCount']
-# 	limit_count = 90
-# 	total_page = total_record / limit_count
-# 	STARTPOSITION,MAXRESULTS = 0,0  
-# 	for i in range(total_page + 1):
-# 		MAXRESULTS = STARTPOSITION + limit_count
-# 		account_query = """SELECT Name, Active, Classification, AccountType, AccountSubType, CurrencyRef, Id FROM Account ORDER BY Id Desc STARTPOSITION {0} MAXRESULTS {1} """.format(STARTPOSITION, MAXRESULTS)
-# 		fetch_item_qb = quickbooks_obj.query(account_query)
-# 		qb_account =  fetch_item_qb['QueryResponse']
-# 		if qb_account:
-# 			quickbook_account.extend(qb_account['Account'])
-# 		STARTPOSITION = STARTPOSITION + limit_count
-# 	return quickbook_account
-
-# """Code to fetch all the Account from Quickbooks And store it in ERPNEXT"""
-# def sync_Account(quickbooks_obj):
-# 	"""Fetch Account data from QuickBooks"""
-# 	quickbooks_account_list = []
-# 	get_qb_account = Query_limit(quickbooks_obj)
-# 	sync_qb_accounts(get_qb_account,quickbooks_account_list)
-
 def sync_Account(quickbooks_obj):
 	"""Fetch Account data from QuickBooks"""
 	quickbooks_account_list = []
 	business_objects = "Account"
 	get_qb_account = pagination(quickbooks_obj, business_objects)
 	if get_qb_account:
-		# print get_qb_account,"0000000000000000000"
 		sync_qb_accounts(get_qb_account, quickbooks_account_list)
 
 def sync_qb_accounts(get_qb_account, quickbooks_account_list):
