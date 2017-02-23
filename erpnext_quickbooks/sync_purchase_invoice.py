@@ -16,13 +16,16 @@ def sync_pi_orders(quickbooks_obj):
 	qb_purchase_invoice = quickbooks_obj.query(purchase_invoice_query)
 	if qb_purchase_invoice['QueryResponse']:
 		get_qb_purchase_invoice =  qb_purchase_invoice['QueryResponse']
+		print get_qb_purchase_invoice,"lllllll"
 		sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
 def sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list):
+	company_name = frappe.defaults.get_defaults().get("company")
+	default_currency = frappe.db.get_value("Company" ,{"name":company_name},"default_currency")
 	for qb_orders in get_qb_purchase_invoice['Bill']:
 		if valid_supplier_and_product(qb_orders):
 			try:
-				create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list)
+				create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, default_currency)
 			except Exception, e:
 				if e.args[0] and e.args[0].startswith("402"):
 					raise e
@@ -32,22 +35,23 @@ def sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
 def valid_supplier_and_product(qb_orders):
 	"""  valid_supplier data from ERPNEXT and store in ERPNEXT """ 
+	from .sync_suppliers import create_Supplier
 	supplier_id = qb_orders['VendorRef']['value'] 
 	if supplier_id:
 		if not frappe.db.get_value("Supplier", {"quickbooks_supp_id": supplier_id}, "name"):
-			json_data = json.dumps(qb_orders['VendorRef'])
-			create_Supplier(ast.literal_eval(json_data), quickbooks_supplier_list = [])		
+			# json_data = json.dumps(qb_orders['VendorRef'])
+			create_Supplier(qb_orders['VendorRef'], quickbooks_supplier_list = [])		
 	else:
 		raise _("supplier is mandatory to create order")
 	
 	return True
 
-def create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, company=None):
+def create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, default_currency=None):
 	""" Store Sales Invoice in ERPNEXT """
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
-	create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, company=None)
+	create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, default_currency=None)
 
-def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, company=None):
+def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_invoice_list, default_currency=None):
 	pi = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": qb_orders.get("Id")}, "name") 
 	term_id = qb_orders.get('SalesTermRef').get('value') if qb_orders.get('SalesTermRef') else ""
 	term = ""
@@ -61,7 +65,10 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 			"quickbooks_bill_no": qb_orders.get("DocNumber"),
 			"title" : frappe.db.get_value("Supplier",{"quickbooks_supp_id":qb_orders['VendorRef'].get('value')},"name"),
 			"supplier": frappe.db.get_value("Supplier",{"quickbooks_supp_id":qb_orders['VendorRef'].get('value')},"name"),
+			"currency" : qb_orders.get("CurrencyRef").get('value') if qb_orders.get("CurrencyRef") else default_currency,
+			"conversion_rate" : qb_orders.get("ExchangeRate") if qb_orders.get("CurrencyRef") else 1,
 			"posting_date": qb_orders.get('TxnDate'),
+			"due_date": qb_orders.get('DueDate'),
 			"buying_price_list": quickbooks_settings.buying_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",

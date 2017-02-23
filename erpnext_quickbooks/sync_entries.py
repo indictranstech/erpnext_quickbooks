@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 import frappe
 from frappe import _
+from frappe.utils import flt, cstr, nowdate
 import requests.exceptions
 from .utils import make_quickbooks_log
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_payment_entry_against_invoice
@@ -13,6 +14,7 @@ def payment_invoice(quickbooks_obj):
 	qb_payment = quickbooks_obj.query(payment)
 	if qb_payment['QueryResponse']:
 		get_qb_payment =  qb_payment['QueryResponse']['Payment']
+		# print get_qb_payment,"-------------------------------"
 		sync_qb_journal_entry_against_si(get_qb_payment)
 	
 def sync_qb_journal_entry_against_si(get_qb_payment):
@@ -26,9 +28,10 @@ def create_journal_entry_against_si(recived_payment):
 	
  	LineEx = item
  	Payment_Id = recived_payment['Id']
+ 	ExchangeRate = recived_payment['ExchangeRate']
  	TotalAmt = recived_payment['TotalAmt']
  	Transaction_date=recived_payment['TxnDate']
- 	Amount = recived_payment['Line'][0]['Amount']
+ 	Amount = recived_payment['Line'][0]['Amount'] * ExchangeRate
  	Customer_reference = recived_payment['CustomerRef']
  	Type = recived_payment['Line'][0]['LinkedTxn'][0]['TxnType']
  	reference_qb_bank_account_id = recived_payment['DepositToAccountRef']['value'] if recived_payment.get('DepositToAccountRef') else None
@@ -42,7 +45,7 @@ def create_journal_entry_against_si(recived_payment):
 	try:	
 		if not 	frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": qb_journal_entry_id}, "name"): 	
 			if Type == "Invoice" and sales_invoice_name:
-				si_je = get_payment_entry_against_invoice("Sales Invoice", sales_invoice_name, amount=None, debit_in_account_currency=None, journal_entry=False, bank_account=qb_account_name)
+				si_je = get_payment_entry_against_invoice("Sales Invoice", sales_invoice_name, amount=Amount, debit_in_account_currency=Amount, journal_entry=False, bank_account=qb_account_name)
 				si_je = frappe.get_doc(si_je)
 				si_je.quickbooks_journal_entry_id = qb_journal_entry_id
 				si_je.naming_series = "SI-JV-Quickbooks-"
@@ -79,8 +82,9 @@ def create_journal_entry_against_pi(made_payment):
 	Transaction_date = made_payment['TxnDate']
 	Supplier_Ref = made_payment['VendorRef']
 	CurrencyRef = made_payment['CurrencyRef']
+	ExchangeRate = made_payment['ExchangeRate']
 	Deposit_To_AccountRef = made_payment.get('CheckPayment')
-	Amount =  made_payment.get('Line')[0]['Amount'] if made_payment['Line'] else made_payment['TotalAmt']
+	Amount =  flt(made_payment.get('Line')[0]['Amount']) * flt(ExchangeRate) if made_payment['Line'] else flt(made_payment['TotalAmt']) * flt(ExchangeRate)
 	Type = made_payment['PayType']
 	reference_quickbooks_PI_id = made_payment.get('Line')[0]['LinkedTxn'][0]['TxnId'] if made_payment['Line'] else ''
 	Bill_Payment_Id = made_payment['Id']
@@ -95,7 +99,7 @@ def create_journal_entry_against_pi(made_payment):
 	try:	
 		if not 	frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": qb_journal_entry_id}, "name"): 	
 			if Type == "Check" and purchase_invoice_name:
-				pi_je = get_payment_entry_against_invoice("Purchase Invoice", purchase_invoice_name, amount=None, debit_in_account_currency=None, journal_entry=False, bank_account=qb_account_name)
+				pi_je = get_payment_entry_against_invoice("Purchase Invoice", purchase_invoice_name, amount=Amount, debit_in_account_currency=Amount, journal_entry=False, bank_account=qb_account_name)
 				pi_je = frappe.get_doc(pi_je)
 				pi_je.quickbooks_journal_entry_id = qb_journal_entry_id
 				pi_je.naming_series = "PI-JV-Quickbooks-"

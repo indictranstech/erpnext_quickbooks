@@ -15,13 +15,16 @@ def sync_si_orders(quickbooks_obj):
 	qb_invoice = quickbooks_obj.query(invoice_query)
 	if qb_invoice['QueryResponse']:
 		get_qb_invoice =  qb_invoice['QueryResponse']
+		# print get_qb_invoice,"---------------"
 		sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
 
 def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
+	company_name = frappe.defaults.get_defaults().get("company")
+	default_currency = frappe.db.get_value("Company" ,{"name":company_name},"default_currency")
 	for qb_orders in get_qb_invoice['Invoice']:
 		if valid_customer_and_product(qb_orders):
 			try:
-				create_order(qb_orders, quickbooks_invoice_list)
+				create_order(qb_orders, quickbooks_invoice_list, default_currency)
 			except Exception, e:
 				if e.args[0] and e.args[0].startswith("402"):
 					raise e
@@ -31,22 +34,24 @@ def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
 					
 def valid_customer_and_product(qb_orders):
 	""" Fetch valid_customer data from ERPNEXT and store in ERPNEXT """ 
+	from .sync_customers import create_customer
 	customer_id = qb_orders['CustomerRef'].get('value') 
 	if customer_id:
 		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": customer_id}, "name"):
-			json_data = json.dumps(qb_orders['CustomerRef'])
-			create_customer(ast.literal_eval(json_data), quickbooks_customer_list = [])		
+			create_customer(qb_orders['CustomerRef'], quickbooks_customer_list = [])
+			# json_data = json.dumps(qb_orders['CustomerRef'])
+			# create_customer(ast.literal_eval(json_data), quickbooks_customer_list = [])		
 	else:
 		raise _("Customer is mandatory to create order")
 	
 	return True
 
-def create_order(qb_orders, quickbooks_invoice_list, company=None):
+def create_order(qb_orders, quickbooks_invoice_list, default_currency):
 	""" Store Sales Invoice in ERPNEXT """
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
-	create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, company=None)
+	create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, default_currency)
 
-def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, company=None):
+def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, default_currency):
 	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": qb_orders.get("Id")}, "name")
 	term_id = qb_orders.get('SalesTermRef').get('value') if qb_orders.get('SalesTermRef') else ""
 	term = ""
@@ -57,6 +62,8 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 			"doctype": "Sales Invoice",
 			"quickbooks_invoce_id" : qb_orders.get("Id"),
 			"naming_series": "SINV-",
+			"currency" : qb_orders.get("CurrencyRef").get('value') if qb_orders.get("CurrencyRef") else default_currency,
+			"conversion_rate" : qb_orders.get("ExchangeRate") if qb_orders.get("CurrencyRef") else 1,
 			"quickbooks_invoice_no" : qb_orders.get("DocNumber"),
 			"title": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
 			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
@@ -107,7 +114,7 @@ def get_order_items(order_items, quickbooks_settings):
 			item_code = get_item_code(qb_item)
 			items.append({
 				"item_code": item_code if item_code else '',
-				"item_name": qb_item.get('Description')[:35] if qb_item.get('Description') else '',
+				"item_name": item_code if item_code else qb_item.get('Description')[:35],
 				"description": qb_item.get('Description') if qb_item.get('Description') else '',
 				"rate": qb_item.get('SalesItemLineDetail').get('UnitPrice') if qb_item.get('SalesItemLineDetail').get('UnitPrice') else qb_item.get('Amount'),
 				"qty": qb_item.get('SalesItemLineDetail').get('Qty') if qb_item.get('SalesItemLineDetail').get('Qty') else 1,

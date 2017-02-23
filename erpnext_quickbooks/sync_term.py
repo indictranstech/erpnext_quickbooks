@@ -32,7 +32,7 @@ def create_term(qb_term, quickbooks_term_list):
 		term.insert()
 
 		frappe.db.commit()
-		quickbooks_term_list.append(term.quickbooks_cust_id)
+		quickbooks_term_list.append(term.quickbooks_term_id)
 
 	except Exception, e:
 		make_quickbooks_log(title=e.message, status="Error", method="create_term", message=frappe.get_traceback(),

@@ -17,7 +17,6 @@ def sync_suppliers(quickbooks_obj):
 
 	
 def sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list):
-	print get_qb_supplier," 00000000000000 "
 	for qb_supplier in get_qb_supplier:
 		if not frappe.db.get_value("Supplier", {"quickbooks_supp_id": qb_supplier.get('Id')}, "name"):
 			create_Supplier(qb_supplier, quickbooks_supplier_list)
