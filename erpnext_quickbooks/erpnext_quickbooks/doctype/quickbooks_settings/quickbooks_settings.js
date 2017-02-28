@@ -83,7 +83,8 @@ cur_frm.cscript.sync_quickbooks_accounts = function(frm) {
 					if(r.message){
 						frappe.msgprint(__("Please visit Chart of Accounts Form , take Help Of your Accountant. "));
 						show_mandatory_field()
-						cur_frm.reload_doc();
+						// cur_frm.reload_doc();
+						tax_mapper();
 					}
 				}
 		});
@@ -95,9 +96,27 @@ show_mandatory_field = function() {
 	cur_frm.set_df_property("sync_quickbooks_accounts","hidden",1)
 	cur_frm.set_df_property("section_break_1","hidden",0)
 	cur_frm.set_df_property("section_break_2","hidden",0)
+	cur_frm.set_df_property("section_break_3","hidden",0)
 	cur_frm.set_df_property("sync_data_to_qb","hidden",0)
+	cur_frm.set_df_property("section_break_5","hidden",0)
 	mandatory = ['selling_price_list', 'buying_price_list', 'warehouse', 'cash_bank_account', 'expense_account']
 	$.each(mandatory , function (key, value) {
 		cur_frm.toggle_reqd(value, true);
 	});
+	// tax_mapper();
+}
+
+tax_mapper = function() {
+	frappe.call({
+		method: "erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.quickbooks_tax_head",
+		callback: function(r) {
+			if(r.message){
+				for(var i=0; i<r.message.length ; i++){
+					child = frappe.model.add_child(cur_frm.doc, "Tax Head Mapper", "tax_head_mapper")
+					child.tax_head_quickbooks= r.message[i][0]
+				}
+					refresh_field("tax_head_mapper");
+				}
+			}
+		});
 }

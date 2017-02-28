@@ -91,24 +91,30 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 def get_individual_item_tax(order_items, quickbooks_settings):
 	"""tax break for individual item from QuickBooks"""
 	taxes = []
-	Default_company = frappe.defaults.get_defaults().get("company")
-	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
-	tax_amount = 0
+	taxes_rate_list = {}
+	account_head_list = []
+
 	for i in get_order_items(order_items, quickbooks_settings):
-		if i['quickbooks__tax_code_value']:
-			tax_amount = flt(tax_amount) + (flt(i['quickbooks__tax_code_value']) * (i['qty'] *i['rate']))/100
-	if tax_amount:
+		account_head =json.loads(i['item_tax_rate']).keys()[0]
+		if account_head in set(account_head_list):
+			taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+		else:
+			taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+			account_head_list.append(account_head)
+
+	for key, value in taxes_rate_list.iteritems():
 		taxes.append({
-				"charge_type": _("On Net Total"),
-				"account_head": get_tax_account_head(),
-				"description": _("Total Tax added from invoice"),
-				"rate": 0,
-				"tax_amount": tax_amount
-				})
+			"charge_type": _("On Net Total"),
+			"account_head": key,
+			"description": _("Total Tax added from invoice"),
+			"rate": 0,
+			"tax_amount": value
+			})
 
 	account_expenses = []
 	account_details = account_based_expense_line_detail(order_items, quickbooks_settings)
 	for index,i in enumerate(account_details):
+		account_heads =json.loads(i['item_tax_rate']).keys()[0]
 		if i['expense_account']:
 			account_expenses.append({
 					"charge_type": "Actual",
@@ -119,14 +125,13 @@ def get_individual_item_tax(order_items, quickbooks_settings):
 					})
 		if i['quickbooks_tax_code_ref']:
 			account_expenses.append({"charge_type": "On Previous Row Amount",
-					"account_head": get_tax_account_head(),
+					"account_head": account_heads,
 					"description": i['quickbooks_tax_code_ref'],
 					"rate": i['quickbooks__tax_code_value'],
 					"row_id": len(taxes) + 2 *(index +1) -1
 					})
 	taxes.extend(account_expenses) if account_expenses else ''
 	return taxes
-
 
 def get_order_items(order_items, quickbooks_settings):
 	"""Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks"""
@@ -160,8 +165,9 @@ def item_based_expense_line_detail_tax_code_ref(qb_item):
 							`tabQuickBooks TaxRate` as qbr,
 							(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
 						where 
-							qbr.name = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
-		item_wise_tax[cstr(get_tax_account_head())] = flt(individual_item_tax[0]['tax_percent'])
+							qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
+		item_tax_rate = get_tax_head_mapped_to_particular_account(individual_item_tax[0]['tax_head'])
+		item_wise_tax[cstr(item_tax_rate)] = flt(individual_item_tax[0]['tax_percent'])
 	return item_wise_tax, cstr(individual_item_tax[0]['tax_head']) if individual_item_tax else '', flt(individual_item_tax[0]['tax_percent']) if individual_item_tax else 0
 
 def account_based_expense_line_detail(order_items, quickbooks_settings):
@@ -194,13 +200,21 @@ def account_based_expense_line_detail_tax_code_ref(qb_item):
 							`tabQuickBooks TaxRate` as qbr,
 							(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
 						where 
-							qbr.name = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
-		item_wise_tax[cstr(get_tax_account_head())] = flt(individual_item_tax[0]['tax_percent'])
+							qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
+		item_tax_rate = get_tax_head_mapped_to_particular_account(individual_item_tax[0]['tax_head'])
+		item_wise_tax[cstr(item_tax_rate)] = flt(individual_item_tax[0]['tax_percent'])
 	return item_wise_tax, cstr(individual_item_tax[0]['tax_head']) if individual_item_tax else '', flt(individual_item_tax[0]['tax_percent']) if individual_item_tax else 0
 
 
-
-
+def get_tax_head_mapped_to_particular_account(tax_head):
+	""" fetch respective tax head from Tax Head Mappe table """
+	account_head_erpnext =frappe.db.get_value("Tax Head Mapper", {"tax_head_quickbooks": tax_head, \
+			"parent": "Quickbooks Settings"}, "account_head_erpnext")
+	if not account_head_erpnext:
+		Default_company = frappe.defaults.get_defaults().get("company")
+		Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
+		account_head_erpnext = "Miscellaneous Expenses" +" - "+ Company_abbr
+	return account_head_erpnext
 
 def get_item_code(qb_item):
 	quickbooks_item_id = qb_item.get('ItemBasedExpenseLineDetail').get('ItemRef').get('value') if qb_item.get('ItemBasedExpenseLineDetail') else ''

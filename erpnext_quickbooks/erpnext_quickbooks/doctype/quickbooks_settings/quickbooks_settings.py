@@ -78,3 +78,7 @@ def quickbooks_authentication_popup(consumer_key, consumer_secret):
 	except Exception, e:
 		frappe.throw(_("HTTPSConnection Error Please Connect to Internet"))
 	return quickbooks_settings.authorize_url
+
+@frappe.whitelist()
+def quickbooks_tax_head():
+	return frappe.get_all('QuickBooks TaxRate', fields =["display_name"], as_list=1)

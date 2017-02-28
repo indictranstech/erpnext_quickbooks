@@ -117,11 +117,11 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	create_Employee(quickbooks_obj)
 	sync_items(quickbooks_obj)
 	sync_Account(quickbooks_obj)
-	sync_si_orders(quickbooks_obj)
 	sync_pi_orders(quickbooks_obj)
+	sync_si_orders(quickbooks_obj)
 
-	payment_invoice(quickbooks_obj)
 	bill_payment(quickbooks_obj)
+	payment_invoice(quickbooks_obj)
 	sync_entry(quickbooks_obj)
 
 def validate_quickbooks_settings(quickbooks_settings):
@@ -167,6 +167,9 @@ def sync_account_masters():
 	    minorversion=3
 	)
 	creates_qb_accounts_heads_to_erp_chart_of_accounts()
+	sync_taxagency(quickbooks_objects)
+	sync_tax_code(quickbooks_objects)
+	sync_tax_rate(quickbooks_objects)
 	sync_Account(quickbooks_objects)
 	frappe.db.sql("""update `tabSingles` set value = 1 where `doctype` = 'Quickbooks Settings' and `field` ='sync_master'""")
 	frappe.db.commit()

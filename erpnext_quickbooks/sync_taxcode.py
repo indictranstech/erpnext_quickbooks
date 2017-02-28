@@ -64,8 +64,8 @@ def get_quickbooks_purchase_tax_rate_list(qb_tax_code):
 		quickbooks_purchase_tax_rate_list.append({
 			"tax_type_applicable" : qb_tax_code.get('PurchaseTaxRateList').get('TaxRateDetail')[0].get('TaxTypeApplicable'),
 			"tax_rate_ref": str(qb_tax_code.get('PurchaseTaxRateList').get('TaxRateDetail')[0].get('TaxRateRef')),
-			"tax_rate_name": qb_tax_code.get('SalesTaxRateList').get('TaxRateDetail')[0].get('TaxRateRef').get('name'),
-			"tax_rate_id": qb_tax_code.get('SalesTaxRateList').get('TaxRateDetail')[0].get('TaxRateRef').get('value'),
+			"tax_rate_name": qb_tax_code.get('PurchaseTaxRateList').get('TaxRateDetail')[0].get('TaxRateRef').get('name'),
+			"tax_rate_id": qb_tax_code.get('PurchaseTaxRateList').get('TaxRateDetail')[0].get('TaxRateRef').get('value'),
 			"tax_order": qb_tax_code.get('PurchaseTaxRateList').get('TaxRateDetail')[0].get('TaxOrder')
 			})
 
