@@ -5,6 +5,8 @@ from frappe.utils import flt, cstr, nowdate
 import requests.exceptions
 from .utils import make_quickbooks_log
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_payment_entry_against_invoice
+import math
+
 
 """Important code to fetch payment done againt invoice and create journal Entry""" 
 
@@ -79,12 +81,12 @@ def sync_qb_journal_entry_against_pi(get_qb_billpayment):
 		create_journal_entry_against_pi(made_payment)
 	
 def create_journal_entry_against_pi(made_payment):
+	# print made_payment,"---------------------"
 	Transaction_date = made_payment['TxnDate']
 	Supplier_Ref = made_payment['VendorRef']
 	CurrencyRef = made_payment['CurrencyRef']
 	ExchangeRate = made_payment['ExchangeRate']
 	Deposit_To_AccountRef = made_payment.get('CheckPayment')
-	Amount =  flt(made_payment.get('Line')[0]['Amount']) * flt(ExchangeRate) if made_payment['Line'] else flt(made_payment['TotalAmt']) * flt(ExchangeRate)
 	Type = made_payment['PayType']
 	reference_quickbooks_PI_id = made_payment.get('Line')[0]['LinkedTxn'][0]['TxnId'] if made_payment['Line'] else ''
 	Bill_Payment_Id = made_payment['Id']
@@ -94,12 +96,16 @@ def create_journal_entry_against_pi(made_payment):
 	if Bill_Payment_Id:
 		qb_journal_entry_id = "PI" + Bill_Payment_Id
 
-	purchase_invoice_name = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": reference_quickbooks_PI_id}, "name")
+	purchase_invoice_name = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": reference_quickbooks_PI_id}, ["name", "conversion_rate"], as_dict=1)
+	# purchase_invoice_name = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": reference_quickbooks_PI_id}, "name")
+	Amount =  flt(made_payment.get('Line')[0]['Amount']) * flt(purchase_invoice_name['conversion_rate'])
+	Amounts = math.floor(Amount * 10 ** 2) / 10 ** 2
+	# print purchase_invoice_name['name'], flt(made_payment.get('Line')[0]['Amount']), Amount , purchase_invoice_name['conversion_rate'], ExchangeRate
 	qb_account_name = frappe.db.get_value("Account", {"quickbooks_account_id": reference_qb_bank_account_id}, "name")
 	try:	
 		if not 	frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": qb_journal_entry_id}, "name"): 	
-			if Type == "Check" and purchase_invoice_name:
-				pi_je = get_payment_entry_against_invoice("Purchase Invoice", purchase_invoice_name, amount=Amount, debit_in_account_currency=Amount, journal_entry=False, bank_account=qb_account_name)
+			if Type == "Check" and purchase_invoice_name['name']:
+				pi_je = get_payment_entry_against_invoice("Purchase Invoice", purchase_invoice_name['name'], amount=Amounts, debit_in_account_currency=Amounts, journal_entry=False, bank_account=qb_account_name)
 				pi_je = frappe.get_doc(pi_je)
 				pi_je.quickbooks_journal_entry_id = qb_journal_entry_id
 				pi_je.naming_series = "PI-JV-Quickbooks-"

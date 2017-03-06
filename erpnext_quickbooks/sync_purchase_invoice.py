@@ -16,7 +16,6 @@ def sync_pi_orders(quickbooks_obj):
 	qb_purchase_invoice = quickbooks_obj.query(purchase_invoice_query)
 	if qb_purchase_invoice['QueryResponse']:
 		get_qb_purchase_invoice =  qb_purchase_invoice['QueryResponse']
-		# print get_qb_purchase_invoice,"lllllll"
 		# get_qb_purchase_invoice =  {u'startPosition': 1, u'totalCount': 7, u'Bill': [{u'SyncToken': u'1', u'domain': u'QBO', u'APAccountRef': {u'name': u'Accounts Payable (Creditors)', u'value': u'56'}, u'VendorRef': {u'name': u'kala joshi', u'value': u'10'}, u'GlobalTaxCalculation': u'TaxExcluded', u'TxnDate': u'2017-02-24', u'TotalAmt': 2652.5, u'ExchangeRate': 1, u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 2652.5, u'Id': u'23', u'sparse': False, u'Line': [{u'DetailType': u'ItemBasedExpenseLineDetail', u'Amount': 2000.0, u'Id': u'1', u'ItemBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'Qty': 1, u'BillableStatus': u'NotBillable', u'UnitPrice': 2000, u'ItemRef': {u'name': u'laptop', u'value': u'3'}}, u'Description': u'description'}, {u'DetailType': u'ItemBasedExpenseLineDetail', u'Amount': 50.0, u'Id': u'4', u'ItemBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'10'}, u'Qty': 1, u'BillableStatus': u'NotBillable', u'UnitPrice': 50, u'ItemRef': {u'name': u'mug', u'value': u'5'}}}, {u'DetailType': u'AccountBasedExpenseLineDetail', u'Amount': 500.0, u'Id': u'2', u'AccountBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'AccountRef': {u'name': u'Purchases', u'value': u'43'}, u'BillableStatus': u'NotBillable'}, u'Description': u'description'}], u'Balance': 2652.5, u'DueDate': u'2017-02-24', u'TxnTaxDetail': {u'TotalTax': 102.5, u'TaxLine': [{u'DetailType': u'TaxLineDetail', u'Amount': 100.0, u'TaxLineDetail': {u'NetAmountTaxable': 2500.0, u'TaxPercent': 4, u'TaxRateRef': {u'value': u'11'}, u'PercentBased': True}}, {u'DetailType': u'TaxLineDetail', u'Amount': 2.5, u'TaxLineDetail': {u'NetAmountTaxable': 50.0, u'TaxPercent': 5, u'TaxRateRef': {u'value': u'15'}, u'PercentBased': True}}]}, u'MetaData': {u'CreateTime': u'2017-02-24T01:59:54-08:00', u'LastUpdatedTime': u'2017-02-24T05:40:11-08:00'}}, {u'SyncToken': u'2', u'domain': u'QBO', u'APAccountRef': {u'name': u'Accounts Payable (Creditors)', u'value': u'56'}, u'VendorRef': {u'name': u'kala joshi', u'value': u'10'}, u'GlobalTaxCalculation': u'TaxExcluded', u'TxnDate': u'2017-02-23', u'TotalAmt': 2080.0, u'ExchangeRate': 1, u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 2080.0, u'Id': u'21', u'sparse': False, u'Line': [{u'DetailType': u'ItemBasedExpenseLineDetail', u'Amount': 2000.0, u'Id': u'1', u'ItemBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'Qty': 1, u'BillableStatus': u'NotBillable', u'UnitPrice': 2000, u'ItemRef': {u'name': u'laptop', u'value': u'3'}}, u'Description': u'description'}], u'Balance': 2080.0, u'DueDate': u'2017-02-23', u'TxnTaxDetail': {u'TotalTax': 80.0, u'TaxLine': [{u'DetailType': u'TaxLineDetail', u'Amount': 80.0, u'TaxLineDetail': {u'NetAmountTaxable': 2000.0, u'TaxPercent': 4, u'TaxRateRef': {u'value': u'11'}, u'PercentBased': True}}]}, u'MetaData': {u'CreateTime': u'2017-02-23T02:43:13-08:00', u'LastUpdatedTime': u'2017-02-23T03:12:22-08:00'}}, {u'SyncToken': u'0', u'domain': u'QBO', u'APAccountRef': {u'name': u'Accounts Payable (Creditors)', u'value': u'56'}, u'VendorRef': {u'name': u'jaishree joshi', u'value': u'8'}, u'GlobalTaxCalculation': u'TaxExcluded', u'TxnDate': u'2017-02-23', u'TotalAmt': 1283.36, u'ExchangeRate': 1, u'CurrencyRef': {u'name': u'Indian Rupee', u'value': u'INR'}, u'HomeBalance': 1283.36, u'Id': u'18', u'sparse': False, u'Line': [{u'DetailType': u'ItemBasedExpenseLineDetail', u'Amount': 1234.0, u'Id': u'1', u'ItemBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'Qty': 1, u'BillableStatus': u'NotBillable', u'UnitPrice': 1234, u'ItemRef': {u'name': u'laptop', u'value': u'3'}}, u'Description': u'1234'}], u'Balance': 1283.36, u'DueDate': u'2017-02-23', u'TxnTaxDetail': {u'TotalTax': 49.36, u'TaxLine': [{u'DetailType': u'TaxLineDetail', u'Amount': 49.36, u'TaxLineDetail': {u'NetAmountTaxable': 1234.0, u'TaxPercent': 4, u'TaxRateRef': {u'value': u'11'}, u'PercentBased': True}}]}, u'MetaData': {u'CreateTime': u'2017-02-23T01:40:43-08:00', u'LastUpdatedTime': u'2017-02-23T01:40:43-08:00'}}, {u'SyncToken': u'2', u'domain': u'QBO', u'Id': u'15', u'VendorRef': {u'name': u'Pannu jain', u'value': u'5'}, u'GlobalTaxCalculation': u'TaxExcluded', u'TxnDate': u'2017-02-23', u'APAccountRef': {u'name': u'Accounts Payable (Creditors) - USD', u'value': u'51'}, u'ExchangeRate': 66.845367, u'CurrencyRef': {u'name': u'United States Dollar', u'value': u'USD'}, u'HomeBalance': 0, u'LinkedTxn': [{u'TxnId': u'16', u'TxnType': u'BillPaymentCheck'}, {u'TxnId': u'17', u'TxnType': u'BillPaymentCheck'}], u'DueDate': u'2017-04-24', u'TotalAmt': 1283.36, u'sparse': False, u'Line': [{u'DetailType': u'AccountBasedExpenseLineDetail', u'Amount': 1234.0, u'Id': u'1', u'AccountBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'AccountRef': {u'name': u'Sales of Product Income', u'value': u'44'}, u'BillableStatus': u'NotBillable'}, u'Description': u'descp 2'}], u'Balance': 0, u'SalesTermRef': {u'value': u'4'}, u'TxnTaxDetail': {u'TotalTax': 49.36, u'TaxLine': [{u'DetailType': u'TaxLineDetail', u'Amount': 49.36, u'TaxLineDetail': {u'NetAmountTaxable': 1234.0, u'TaxPercent': 4, u'TaxRateRef': {u'value': u'11'}, u'PercentBased': True}}]}, u'MetaData': {u'CreateTime': u'2017-02-23T01:08:29-08:00', u'LastUpdatedTime': u'2017-02-23T01:12:31-08:00'}}, {u'SyncToken': u'3', u'domain': u'QBO', u'APAccountRef': {u'name': u'Accounts Payable (Creditors) - USD', u'value': u'51'}, u'VendorRef': {u'name': u'Pannu jain', u'value': u'5'}, u'GlobalTaxCalculation': u'TaxExcluded', u'TxnDate': u'2017-02-22', u'TotalAmt': 127.92, u'ExchangeRate': 66.94247, u'CurrencyRef': {u'name': u'United States Dollar', u'value': u'USD'}, u'HomeBalance': 0, u'LinkedTxn': [{u'TxnId': u'9', u'TxnType': u'BillPaymentCheck'}, {u'TxnId': u'10', u'TxnType': u'BillPaymentCheck'}], u'Id': u'7', u'sparse': False, u'Line': [{u'DetailType': u'ItemBasedExpenseLineDetail', u'Amount': 123.0, u'Id': u'1', u'ItemBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'Qty': 1, u'BillableStatus': u'NotBillable', u'UnitPrice': 123, u'ItemRef': {u'name': u'laptop', u'value': u'3'}}, u'Description': u'laptop'}], u'Balance': 0, u'DueDate': u'2017-02-22', u'TxnTaxDetail': {u'TotalTax': 4.92, u'TaxLine': [{u'DetailType': u'TaxLineDetail', u'Amount': 4.92, u'TaxLineDetail': {u'NetAmountTaxable': 123.0, u'TaxPercent': 4, u'TaxRateRef': {u'value': u'11'}, u'PercentBased': True}}]}, u'MetaData': {u'CreateTime': u'2017-02-21T23:31:19-08:00', u'LastUpdatedTime': u'2017-02-21T23:35:46-08:00'}}, {u'SyncToken': u'0', u'domain': u'QBO', u'APAccountRef': {u'name': u'Accounts Payable (Creditors) - USD', u'value': u'51'}, u'VendorRef': {u'name': u'Pannu jain', u'value': u'5'}, u'GlobalTaxCalculation': u'TaxExcluded', u'TxnDate': u'2017-02-22', u'TotalAmt': 1283.36, u'ExchangeRate': 66.94247, u'CurrencyRef': {u'name': u'United States Dollar', u'value': u'USD'}, u'HomeBalance': 85911.29, u'Id': u'8', u'sparse': False, u'Line': [{u'DetailType': u'AccountBasedExpenseLineDetail', u'Amount': 1234.0, u'Id': u'1', u'AccountBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'AccountRef': {u'name': u'Sales of Product Income', u'value': u'44'}, u'BillableStatus': u'NotBillable'}, u'Description': u'descp 2'}], u'Balance': 1283.36, u'DueDate': u'2017-02-22', u'TxnTaxDetail': {u'TotalTax': 49.36, u'TaxLine': [{u'DetailType': u'TaxLineDetail', u'Amount': 49.36, u'TaxLineDetail': {u'NetAmountTaxable': 1234.0, u'TaxPercent': 4, u'TaxRateRef': {u'value': u'11'}, u'PercentBased': True}}]}, u'MetaData': {u'CreateTime': u'2017-02-21T23:32:23-08:00', u'LastUpdatedTime': u'2017-02-21T23:32:23-08:00'}}, {u'SyncToken': u'0', u'domain': u'QBO', u'APAccountRef': {u'name': u'Accounts Payable (Creditors) - USD', u'value': u'51'}, u'VendorRef': {u'name': u'Pannu jain', u'value': u'5'}, u'GlobalTaxCalculation': u'TaxExcluded', u'TxnDate': u'2017-02-22', u'TotalAmt': 255.84, u'ExchangeRate': 66.94247, u'CurrencyRef': {u'name': u'United States Dollar', u'value': u'USD'}, u'HomeBalance': 17126.56, u'Id': u'6', u'sparse': False, u'Line': [{u'DetailType': u'ItemBasedExpenseLineDetail', u'Amount': 123.0, u'Id': u'1', u'ItemBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'Qty': 1, u'BillableStatus': u'NotBillable', u'UnitPrice': 123, u'ItemRef': {u'name': u'laptop', u'value': u'3'}}, u'Description': u'laptop'}, {u'DetailType': u'AccountBasedExpenseLineDetail', u'Amount': 123.0, u'Id': u'2', u'AccountBasedExpenseLineDetail': {u'TaxCodeRef': {u'value': u'3'}, u'AccountRef': {u'name': u'Deferred Krishi Kalyan Cess Input Credit', u'value': u'35'}, u'BillableStatus': u'NotBillable'}, u'Description': u'description 1'}], u'Balance': 255.84, u'DueDate': u'2017-02-23', u'TxnTaxDetail': {u'TotalTax': 9.84, u'TaxLine': [{u'DetailType': u'TaxLineDetail', u'Amount': 9.84, u'TaxLineDetail': {u'NetAmountTaxable': 246.0, u'TaxPercent': 4, u'TaxRateRef': {u'value': u'11'}, u'PercentBased': True}}]}, u'MetaData': {u'CreateTime': u'2017-02-21T23:30:06-08:00', u'LastUpdatedTime': u'2017-02-21T23:30:06-08:00'}}], u'maxResults': 7}
 		sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
@@ -59,6 +58,8 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 	if term_id:
 		term = frappe.db.get_value("Terms and Conditions", {"quickbooks_term_id": term_id}, ["name","terms"],as_dict=1)
 	if not pi:
+		stock_item = update_stock(qb_orders['Line'], quickbooks_settings)
+		print stock_item, "updata update"
 		pi = frappe.get_doc({
 			"doctype": "Purchase Invoice",
 			"quickbooks_purchase_invoice_id" : qb_orders.get("Id"),
@@ -70,12 +71,13 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 			"conversion_rate" : qb_orders.get("ExchangeRate") if qb_orders.get("CurrencyRef") else 1,
 			"posting_date": qb_orders.get('TxnDate'),
 			"due_date": qb_orders.get('DueDate'),
-			"update_stock": 1,
+			"update_stock": 0 if stock_item == False else 1,
 			"buying_price_list": quickbooks_settings.buying_price_list,
 			"ignore_pricing_rule": 1,
 			"apply_discount_on": "Net Total",
-			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
-			"taxes": get_individual_item_tax(qb_orders['Line'], quickbooks_settings),
+			"items": get_order_items(qb_orders['Line'], quickbooks_settings, stock_item),
+			"taxes": get_individual_item_tax(qb_orders['Line'], quickbooks_settings, stock_item) if stock_item == True 
+			else get_individual_ccount_based_expense_line(qb_orders['Line'], quickbooks_settings, stock_item),
 			"tc_name": term.get('name') if term else "",
 			"terms": term.get('terms')if term else ""
 		})
@@ -87,58 +89,162 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 		frappe.db.commit()	
 	return quickbooks_purchase_invoice_list
 
+# update_stock(qb_orders['Line'], quickbooks_settings)
+def update_stock(line, quickbooks_settings):
+	is_stock_item = True
+	Item_Detail, Account_Detail = 0,0
+	for i in line:
+		if i['DetailType'] =='ItemBasedExpenseLineDetail':
+			Item_Detail += 1
+		elif i['DetailType'] =='AccountBasedExpenseLineDetail':
+			Account_Detail +=1
+	if Account_Detail > 0 and Item_Detail ==0:
+		is_stock_item = False
+	return is_stock_item
 
-def get_individual_item_tax(order_items, quickbooks_settings):
+# def get_individual_item_tax(order_items, quickbooks_settings):
+# 	"""tax break for individual item from QuickBooks"""
+# 	taxes = []
+# 	taxes_rate_list = {}
+# 	account_head_list = []
+
+# 	for i in get_order_items(order_items, quickbooks_settings):
+# 		account_head =json.loads(i['item_tax_rate']).keys()[0]
+# 		if account_head in set(account_head_list) and float(i['quickbooks__tax_code_value']) != 0.0:
+# 			taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+# 		elif i['quickbooks__tax_code_value'] != 0:
+# 			taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+# 			account_head_list.append(account_head)
+
+# 	if taxes_rate_list:
+# 		for key, value in taxes_rate_list.iteritems():
+# 			taxes.append({
+# 				"charge_type": _("On Net Total"),
+# 				"account_head": key,
+# 				"description": _("Total Tax added from invoice"),
+# 				"rate": 0,
+# 				"tax_amount": value
+# 				})
+
+# 	account_expenses = []
+# 	account_details = account_based_expense_line_detail(order_items, quickbooks_settings)
+# 	for index,i in enumerate(account_details):
+# 		account_heads =json.loads(i['item_tax_rate']).keys()[0]
+# 		if i['expense_account']:
+# 			account_expenses.append({
+# 					"charge_type": "Actual",
+# 					"account_head": i['expense_account'],
+# 					"description": i['expense_account'],
+# 					"rate": 0,
+# 					"tax_amount": i["rate"]
+# 					})
+# 		if i['quickbooks_tax_code_ref'] and i["quickbooks__tax_code_value"] != 0:
+# 			account_expenses.append({"charge_type": "On Previous Row Amount",
+# 					"account_head": account_heads,
+# 					"description": i['quickbooks_tax_code_ref'],
+# 					"rate": i['quickbooks__tax_code_value'],
+# 					"row_id": len(taxes) + 2 *(index +1) -1,
+# 					"tax_amount" :float(i["rate"] * i['quickbooks__tax_code_value'] / 100)
+# 					})
+# 	taxes.extend(account_expenses) if account_expenses else ''
+# 	return taxes
+
+def get_individual_ccount_based_expense_line(order_items, quickbooks_settings, stock_item):
+	taxes = []
+	taxes_rate_list = {}
+	account_head_list = []
+
+	if stock_item == False:
+		for i in get_order_items(order_items, quickbooks_settings, stock_item):
+			account_head =json.loads(i['item_tax_rate']).keys()[0]
+			if account_head in set(account_head_list) and float(i['quickbooks__tax_code_value']) != 0.0:
+				taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+			elif i['quickbooks__tax_code_value'] != 0:
+				taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+				account_head_list.append(account_head)
+
+		if taxes_rate_list:
+			for key, value in taxes_rate_list.iteritems():
+				taxes.append({
+					"category" : _("Total"),
+					"charge_type": _("On Net Total"),
+					"account_head": key,
+					"description": _("Total Tax added from invoice"),
+					"rate": 0,
+					"tax_amount": value
+					})
+	return taxes
+
+def get_individual_item_tax(order_items, quickbooks_settings, stock_item):
 	"""tax break for individual item from QuickBooks"""
 	taxes = []
 	taxes_rate_list = {}
 	account_head_list = []
 
-	for i in get_order_items(order_items, quickbooks_settings):
-		account_head =json.loads(i['item_tax_rate']).keys()[0]
-		if account_head in set(account_head_list):
-			taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
-		else:
-			taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
-			account_head_list.append(account_head)
+	if stock_item == True:
+		for i in get_order_items(order_items, quickbooks_settings, stock_item):
+			account_head =json.loads(i['item_tax_rate']).keys()[0]
+			if account_head in set(account_head_list) and float(i['quickbooks__tax_code_value']) != 0.0:
+				taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+			elif i['quickbooks__tax_code_value'] != 0:
+				taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+				account_head_list.append(account_head)
 
-	for key, value in taxes_rate_list.iteritems():
-		taxes.append({
-			"charge_type": _("On Net Total"),
-			"account_head": key,
-			"description": _("Total Tax added from invoice"),
-			"rate": 0,
-			"tax_amount": value
-			})
-
-	account_expenses = []
-	account_details = account_based_expense_line_detail(order_items, quickbooks_settings)
-	for index,i in enumerate(account_details):
-		account_heads =json.loads(i['item_tax_rate']).keys()[0]
-		if i['expense_account']:
-			account_expenses.append({
-					"charge_type": "Actual",
-					"account_head": i['expense_account'],
-					"description": i['expense_account'],
+		if taxes_rate_list:
+			for key, value in taxes_rate_list.iteritems():
+				taxes.append({
+					"charge_type": _("On Net Total"),
+					"account_head": key,
+					"description": _("Total Tax added from invoice"),
 					"rate": 0,
-					"tax_amount": i["rate"]
+					"tax_amount": value
 					})
-		if i['quickbooks_tax_code_ref']:
-			account_expenses.append({"charge_type": "On Previous Row Amount",
-					"account_head": account_heads,
-					"description": i['quickbooks_tax_code_ref'],
-					"rate": i['quickbooks__tax_code_value'],
-					"row_id": len(taxes) + 2 *(index +1) -1
+		account_expenses = []
+		account_details = account_based_expense_line_detail(order_items, quickbooks_settings)
+		for index,i in enumerate(account_details):
+			account_heads =json.loads(i['item_tax_rate']).keys()[0]
+			if i['expense_account']:
+				account_expenses.append({
+						"charge_type": "Actual",
+						"account_head": i['expense_account'],
+						"description": i['expense_account'],
+						"rate": 0,
+						"tax_amount": i["rate"]
+						})
+		taxes.extend(account_expenses) if account_expenses else ''
+
+		account_expenses_tax = {}
+		account_head_tax_list = []
+		account_tax_details = account_based_expense_line_detail(order_items, quickbooks_settings)
+
+		for index,i in enumerate(account_tax_details):
+			account_heads =json.loads(i['item_tax_rate']).keys()[0]
+
+			if account_heads in set(account_head_tax_list) and float(i['quickbooks__tax_code_value']) != 0.0:
+				account_expenses_tax[account_heads] += float(i['quickbooks__tax_code_value']*i['rate']*1/100)
+			elif i['quickbooks__tax_code_value'] != 0:
+				account_expenses_tax[account_heads] = float(i['quickbooks__tax_code_value']*i['rate']*1/100)
+				account_head_tax_list.append(account_heads)
+
+		taxes_on_account_details = []
+		if account_expenses_tax:
+			for key, value in account_expenses_tax.iteritems():
+				taxes_on_account_details.append({
+					"charge_type": _("Actual"),
+					"account_head": key,
+					"description": key,
+					"rate": 0,
+					"tax_amount": value
 					})
-	taxes.extend(account_expenses) if account_expenses else ''
+		taxes.extend(taxes_on_account_details) if taxes_on_account_details else ''
 	return taxes
 
-def get_order_items(order_items, quickbooks_settings):
+def get_order_items(order_items, quickbooks_settings, stock_item):
 	"""Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks"""
   	items = []
  	for qb_item in order_items:
  		"""Get all the Items details from PI(bill)"""
- 		if qb_item.get('DetailType') == "ItemBasedExpenseLineDetail":
+ 		if qb_item.get('DetailType') == "ItemBasedExpenseLineDetail" and stock_item == True:
 			item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = item_based_expense_line_detail_tax_code_ref(qb_item)
 			item_code = get_item_code(qb_item)
 			items.append({
@@ -152,6 +258,34 @@ def get_order_items(order_items, quickbooks_settings):
 				"item_tax_rate": '{0}'.format(json.dumps(item_tax_rate)),
 				"quickbooks_tax_code_ref": quickbooks_tax_code_ref,
 				"quickbooks__tax_code_value": quickbooks__tax_code_value			
+			})
+		# elif update_stock == False:
+		#  	"""Get all Account details from PI(bill)"""
+		#  	quickbooks_account_reference = qb_item.get('AccountBasedExpenseLineDetail').get('AccountRef').get('value')
+		#  	quickbooks_account = frappe.db.get_value("Account", {"quickbooks_account_id" : quickbooks_account_reference}, "name")
+		#  	items.append({
+		# 		"item_name": quickbooks_account if quickbooks_account else  qb_item.get('Description')[:35],
+		# 		"description":qb_item.get('Description') + _(" Service Item") if qb_item.get('Description') else quickbooks_account,
+		# 		"price_list_rate": qb_item.get('Amount'),
+		# 		"qty": 1,
+		# 		"expense_account": quickbooks_account,
+		# 		"stock_uom": _("Nos")			
+		# 	})
+
+		if qb_item.get('DetailType') == "AccountBasedExpenseLineDetail" and stock_item == False:
+			item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = account_based_expense_line_detail_tax_code_ref(qb_item)
+		 	quickbooks_account_reference = qb_item.get('AccountBasedExpenseLineDetail').get('AccountRef').get('value')
+		 	quickbooks_account = frappe.db.get_value("Account", {"quickbooks_account_id" : quickbooks_account_reference}, "name")
+		 	items.append({
+				"item_name": quickbooks_account,
+				"description":qb_item.get('Description') + _(" Service Item") if qb_item.get('Description') else quickbooks_account,
+				"rate": qb_item.get('Amount'),
+				"qty": 1,
+				"stock_uom": _("Nos"),
+				"expense_account": quickbooks_account,
+				"item_tax_rate": '{0}'.format(json.dumps(item_tax_rate)),
+				"quickbooks_tax_code_ref": quickbooks_tax_code_ref,
+				"quickbooks__tax_code_value": quickbooks__tax_code_value
 			})
 	return items
 

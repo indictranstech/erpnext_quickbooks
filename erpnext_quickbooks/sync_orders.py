@@ -108,26 +108,27 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 def get_individual_item_tax(order_items, quickbooks_settings):
 	"""tax break for individual item from QuickBooks"""
 	taxes = []
-	tax_amount = 0
+	# tax_amount = 0
 	taxes_rate_list = {}
 	account_head_list = []
 
 	for i in get_order_items(order_items, quickbooks_settings):
 		account_head =json.loads(i['item_tax_rate']).keys()[0]
-		if account_head in set(account_head_list):
+		if account_head in set(account_head_list) and i['quickbooks__tax_code_value'] != 0:
 			taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
-		else:
+		elif i['quickbooks__tax_code_value'] != 0:
 			taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 			account_head_list.append(account_head)
 
-	for key, value in taxes_rate_list.iteritems():
-		taxes.append({
-			"charge_type": _("On Net Total"),
-			"account_head": key,
-			"description": _("Total Tax added from invoice"),
-			"rate": 0,
-			"tax_amount": value
-			})
+	if taxes_rate_list:
+		for key, value in taxes_rate_list.iteritems():
+			taxes.append({
+				"charge_type": _("On Net Total"),
+				"account_head": key,
+				"description": _("Total Tax added from invoice"),
+				"rate": 0,
+				"tax_amount": value
+				})
 
 	# for i in get_order_items(order_items, quickbooks_settings):
 	# 	if i['quickbooks__tax_code_value']:
