@@ -15,7 +15,6 @@ def sync_si_orders(quickbooks_obj):
 	qb_invoice = quickbooks_obj.query(invoice_query)
 	if qb_invoice['QueryResponse']:
 		get_qb_invoice =  qb_invoice['QueryResponse']
-		# print get_qb_invoice,"---------------"
 		sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
 
 def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
@@ -79,6 +78,8 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 			"terms": term.get('terms')if term else ""
 
 		})
+		if qb_orders.get('BillAddr').has_key("Country") == False:
+			si.customer_address = new_address_creation(qb_orders, si)
 		si.flags.ignore_mandatory = True
 		si.save(ignore_permissions=True)
 		si.submit()
@@ -104,6 +105,50 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 # 				"tax_amount": tax_amount
 # 				})
 # 	return taxes
+def new_address_creation(qb_orders, si):
+	index =frappe.db.sql("select count(*) as count from `tabAddress` where customer = '{0}'".format(si.customer),as_dict=1)
+	type_of_address ="Billing"
+	if qb_orders.get('BillAddr'):
+		address1 = []
+		full_address =''
+		bill_adress = qb_orders.get('BillAddr')
+		for j in range(len(bill_adress)-1):
+			if 'Line'+str(j+1) != 'Line1':
+				address1.append(bill_adress['Line'+str(j+1)])
+		full_address = " ".join(address1)
+		return create_address(full_address, si, bill_adress, type_of_address, int(index[0]['count'])+1)
+
+def create_address(full_address, si, bill_adress, type_of_address, index):
+	address_title, address_type = get_address_title_and_type(si.customer, type_of_address, index)
+	qb_id = str(bill_adress.get("Id")) + str(address_type)
+	try :
+		customer_address = frappe.get_doc({
+			"doctype": "Address",
+			"quickbooks_address_id": qb_id,
+			"address_title": address_title,
+			"address_type": address_type,
+			"address_line1": full_address[:35] if full_address else '',
+			"address_line2": full_address[35:70] if full_address else '',
+			"customer": si.customer
+			
+		})
+		customer_address.flags.ignore_mandatory = True
+		customer_address.insert()
+			
+	except Exception, e:
+		make_quickbooks_log(title=e.message, status="Error", method="create_customer_address", message=frappe.get_traceback(),
+				request_data=bill_adress, exception=True)
+	return customer_address.name
+			
+def get_address_title_and_type(customer_name, type_of_address, index):
+	address_type = _(type_of_address)
+	address_title = customer_name
+	if frappe.db.get_value("Address", "{0}-{1}".format(customer_name.strip(), address_type)):
+		address_title = "{0}-{1}".format(customer_name.strip(), index)
+		
+	return address_title, address_type 
+
+
 
 def get_individual_item_tax(order_items, quickbooks_settings):
 	"""tax break for individual item from QuickBooks"""
@@ -130,6 +175,9 @@ def get_individual_item_tax(order_items, quickbooks_settings):
 				"tax_amount": value
 				})
 
+	shipping_charges = get_order_shipping_detail(order_items, quickbooks_settings) 
+	if shipping_charges:
+		taxes.extend(shipping_charges)
 	# for i in get_order_items(order_items, quickbooks_settings):
 	# 	if i['quickbooks__tax_code_value']:
 	# 		tax_amount = flt(tax_amount) + (flt(i['quickbooks__tax_code_value']) * (i['qty'] *i['rate']))/100
@@ -146,8 +194,9 @@ def get_individual_item_tax(order_items, quickbooks_settings):
 def get_order_items(order_items, quickbooks_settings):
  	items = []
  	for qb_item in order_items:
-		if qb_item.get('SalesItemLineDetail'):
-		 	item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = tax_code_ref(qb_item)
+ 		shipp_item = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else 1
+		if qb_item.get('SalesItemLineDetail') and shipp_item !="SHIPPING_ITEM_ID":
+		 	item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = tax_code_ref(qb_item, quickbooks_settings)
 			item_code = get_item_code(qb_item)
 			items.append({
 				"item_code": item_code if item_code else '',
@@ -163,7 +212,29 @@ def get_order_items(order_items, quickbooks_settings):
 			})
 	return items
 
-def tax_code_ref(qb_item):
+def get_order_shipping_detail(order_items, quickbooks_settings):
+ 	Shipping = []
+ 	for qb_item in order_items:
+ 		shipp_item = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else 1
+		if qb_item.get('SalesItemLineDetail') and shipp_item =="SHIPPING_ITEM_ID":
+			item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = tax_code_ref(qb_item, quickbooks_settings)
+			Shipping.append({
+				"charge_type": _("Actual"),
+				"account_head": quickbooks_settings.shipping_account,
+				"description": _("Total Shipping cost {}".format(qb_item.get('Amount'))),
+				"rate": 0,
+				"tax_amount": qb_item.get('Amount')
+				})
+			Shipping.append({
+				"charge_type": _("Actual"),
+				"account_head": item_tax_rate.keys()[0],
+				"description": _("Tax applied on shipping {}".format(float(quickbooks__tax_code_value * qb_item.get('Amount')/100))),
+				"rate": 0,
+				"tax_amount": float(quickbooks__tax_code_value * qb_item.get('Amount')/100)
+				})
+	return Shipping
+
+def tax_code_ref(qb_item, quickbooks_settings):
 	item_wise_tax ={}
 	individual_item_tax = ''
 	if qb_item.get('SalesItemLineDetail').get('TaxCodeRef'):
@@ -175,18 +246,19 @@ def tax_code_ref(qb_item):
 						where 
 							qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
 		# item_wise_tax[cstr(get_tax_account_head())] = flt(individual_item_tax[0]['tax_percent'])
-		item_tax_rate = get_tax_head_mapped_to_particular_account(individual_item_tax[0]['tax_head'])
+		item_tax_rate = get_tax_head_mapped_to_particular_account(individual_item_tax[0]['tax_head'], quickbooks_settings)
 		item_wise_tax[cstr(item_tax_rate)] = flt(individual_item_tax[0]['tax_percent'])
 	return item_wise_tax, cstr(individual_item_tax[0]['tax_head']) if individual_item_tax else '', flt(individual_item_tax[0]['tax_percent']) if individual_item_tax else 0
 
-def get_tax_head_mapped_to_particular_account(tax_head):
+def get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings):
 	""" fetch respective tax head from Tax Head Mappe table """
 	account_head_erpnext =frappe.db.get_value("Tax Head Mapper", {"tax_head_quickbooks": tax_head, \
 			"parent": "Quickbooks Settings"}, "account_head_erpnext")
 	if not account_head_erpnext:
-		Default_company = frappe.defaults.get_defaults().get("company")
-		Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
-		account_head_erpnext = "Miscellaneous Expenses" +" - "+ Company_abbr
+		account_head_erpnext = quickbooks_settings.undefined_tax_account
+		# Default_company = frappe.defaults.get_defaults().get("company")
+		# Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
+		# account_head_erpnext = "Miscellaneous Expenses" +" - "+ Company_abbr
 	return account_head_erpnext
 
 def get_item_code(qb_item):

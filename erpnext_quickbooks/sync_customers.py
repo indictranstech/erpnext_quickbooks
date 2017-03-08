@@ -65,7 +65,7 @@ def create_customer_address(qb_customer, customer, address, type_of_address, ind
 			"address_title": address_title,
 			"address_type": address_type,
 			"address_line1": address.get("Line1")[:35] if address.get("Line1") else '',
-			"address_line2": address.get("Line1")[36:70] if address.get("Line1") else '',
+			"address_line2": address.get("Line1")[35:70] if address.get("Line1") else '',
 			"city": address.get("City"),
 			"state": address.get("CountrySubDivisionCode"),
 			"pincode": address.get("PostalCode"),

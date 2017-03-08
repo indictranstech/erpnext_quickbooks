@@ -19,6 +19,40 @@ frappe.ui.form.on('Quickbooks Settings', {
 			function() { frappe.set_route("Form", "Company", cur_frm.doc.select_company); })
 		}
 	 },
+	 onload: function(frm){
+		cur_frm.set_query("cash_bank_account",function(){
+			return{
+				"filters":{
+					"is_group": 0,
+					"company": frappe.defaults.get_default("Company")
+				}
+			};
+		});
+		cur_frm.set_query("expense_account",function(){
+			return{
+				"filters":{
+					"is_group": 0,
+					"company": frappe.defaults.get_default("Company")
+				}
+			};
+		});
+		cur_frm.set_query("shipping_account",function(){
+			return{
+				"filters":{
+					"is_group": 0,
+					"company": frappe.defaults.get_default("Company")
+				}
+			};
+		});
+		cur_frm.set_query("undefined_tax_account",function(){
+			return{
+				"filters":{
+					"is_group": 0,
+					"company": frappe.defaults.get_default("Company")
+				}
+			};
+		});
+	}
 	
 });
 
@@ -31,6 +65,17 @@ cur_frm.fields_dict["taxes"].grid.get_field("tax_account").get_query = function(
 		}
 	}
 },
+
+cur_frm.fields_dict["tax_head_mapper"].grid.get_field("account_head_erpnext").get_query = function(doc, dt, dn){
+	return {
+		"filters": {
+			"is_group": 0,
+			"company": frappe.defaults.get_default("Company")
+		}
+	}
+},
+
+
 
 cur_frm.cscript.connect_to_qb = function () {
 	var me = this;
@@ -73,7 +118,6 @@ pop_up_window = function(url,windowName) {
 
 cur_frm.cscript.sync_quickbooks_accounts = function(frm) {
 	var me = this;
-	// alert("something")
 	if(!cur_frm.doc.__islocal && cur_frm.doc.enable_quickbooks_online=== 1 && cur_frm.doc.authorize_url && cur_frm.doc.select_company) {
 		return frappe.call({
 				method: "erpnext_quickbooks.api.sync_account_masters",
@@ -83,7 +127,6 @@ cur_frm.cscript.sync_quickbooks_accounts = function(frm) {
 					if(r.message){
 						frappe.msgprint(__("Please visit Chart of Accounts Form , take Help Of your Accountant. "));
 						show_mandatory_field()
-						// cur_frm.reload_doc();
 						tax_mapper();
 					}
 				}
@@ -99,7 +142,7 @@ show_mandatory_field = function() {
 	cur_frm.set_df_property("section_break_3","hidden",0)
 	cur_frm.set_df_property("sync_data_to_qb","hidden",0)
 	cur_frm.set_df_property("section_break_5","hidden",0)
-	mandatory = ['selling_price_list', 'buying_price_list', 'warehouse', 'cash_bank_account', 'expense_account']
+	mandatory = ['selling_price_list', 'buying_price_list', 'warehouse', 'cash_bank_account', 'expense_account',"shipping_account", "undefined_tax_account"]
 	$.each(mandatory , function (key, value) {
 		cur_frm.toggle_reqd(value, true);
 	});
