@@ -69,12 +69,12 @@ def quickbooks_accounts_head(quickbooks_settings):
 		category_type = {'Asset, Assets':['Fixed assets','Non-current assets','Accounts receivables (Debtors)','Current assets', 'Bank'],\
 					'Liability, Liabilities':['Accounts payables (Creditors)', 'Non-current liabilities', 'Current liabilities', 'Credit Cards'],\
 					'Income, Income':['Other Income'],\
-					'Expense, Expenses':['Other Expense','Cost of Goods Sold']}
+					'Expense, Expenses':['Other Expenses','Cost of Goods Solds']}
 	else:
 		category_type = {'Asset, Application of Funds (Assets)':['Fixed assets','Non-current assets','Accounts receivables (Debtors)','Current assets', 'Bank'],\
 					'Liability, Source of Funds (Liabilities)':['Accounts payables (Creditors)', 'Non-current liabilities', 'Current liabilities', 'Credit Cards'],\
 					'Income, Income':['Other Income'],\
-					'Expense, Expenses':['Other Expense','Cost of Goods Sold']}
+					'Expense, Expenses':['Other Expenses','Cost of Goods Solds']}
 	return category_type
 
 
@@ -173,10 +173,10 @@ def account_mapper_all_country(qb_account, Company_abbr):
 		parent_account = _("Expenses") + " - " + Company_abbr
 		root_type = _("Expense")
 	elif qb_account.get('AccountType') == 'Other Expense':
-		parent_account = _("Other Expense") + " - " + 'qb' + " - " +  Company_abbr
+		parent_account = _("Other Expenses") + " - " + 'qb' + " - " +  Company_abbr
 		root_type = _("Expense")
 	elif qb_account.get('AccountType') == 'Cost of Goods Sold':
-		parent_account = _("Cost of Goods Sold") + " - " + 'qb' + " - " +  Company_abbr
+		parent_account = _("Cost of Goods Solds") + " - " + 'qb' + " - " +  Company_abbr
 		root_type = _("Expense")
 	return parent_account, root_type 
 

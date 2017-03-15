@@ -26,10 +26,7 @@ def sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 			try:
 				create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, default_currency)
 			except Exception, e:
-				if e.args[0] and e.args[0].startswith("402"):
-					raise e
-				else:
-					make_quickbooks_log(title=e.message, status="Error", method="sync_qb_pi_orders", message=frappe.get_traceback(),
+				make_quickbooks_log(title=e.message, status="Error", method="sync_qb_pi_orders", message=frappe.get_traceback(),
 						request_data=qb_orders, exception=True)
 
 def valid_supplier_and_product(qb_orders):

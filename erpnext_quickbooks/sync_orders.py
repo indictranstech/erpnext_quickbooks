@@ -25,10 +25,7 @@ def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
 			try:
 				create_order(qb_orders, quickbooks_invoice_list, default_currency)
 			except Exception, e:
-				if e.args[0] and e.args[0].startswith("402"):
-					raise e
-				else:
-					make_quickbooks_log(title=e.message, status="Error", method="sync_qb_si_orders", message=frappe.get_traceback(),
+				make_quickbooks_log(title=e.message, status="Error", method="sync_qb_si_orders", message=frappe.get_traceback(),
 						request_data=qb_orders, exception=True)
 					
 def valid_customer_and_product(qb_orders):
@@ -78,7 +75,7 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 			"terms": term.get('terms')if term else ""
 
 		})
-		if qb_orders.get('BillAddr').has_key("Country") == False:
+		if qb_orders.get('BillAddr').has_key("Country") == False or qb_orders.get('BillAddr').has_key("City") == False:
 			si.customer_address = new_address_creation(qb_orders, si)
 		si.flags.ignore_mandatory = True
 		si.save(ignore_permissions=True)
@@ -130,7 +127,6 @@ def create_address(full_address, si, bill_adress, type_of_address, index):
 			"address_line1": full_address[:35] if full_address else '',
 			"address_line2": full_address[35:70] if full_address else '',
 			"customer": si.customer
-			
 		})
 		customer_address.flags.ignore_mandatory = True
 		customer_address.insert()
@@ -145,7 +141,6 @@ def get_address_title_and_type(customer_name, type_of_address, index):
 	address_title = customer_name
 	if frappe.db.get_value("Address", "{0}-{1}".format(customer_name.strip(), address_type)):
 		address_title = "{0}-{1}".format(customer_name.strip(), index)
-		
 	return address_title, address_type 
 
 
@@ -153,17 +148,16 @@ def get_address_title_and_type(customer_name, type_of_address, index):
 def get_individual_item_tax(order_items, quickbooks_settings):
 	"""tax break for individual item from QuickBooks"""
 	taxes = []
-	# tax_amount = 0
 	taxes_rate_list = {}
-	account_head_list = []
+	account_head_list = set()
 
 	for i in get_order_items(order_items, quickbooks_settings):
 		account_head =json.loads(i['item_tax_rate']).keys()[0]
-		if account_head in set(account_head_list) and i['quickbooks__tax_code_value'] != 0:
+		if account_head in account_head_list and i['quickbooks__tax_code_value'] != 0:
 			taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 		elif i['quickbooks__tax_code_value'] != 0:
 			taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
-			account_head_list.append(account_head)
+			account_head_list.add(account_head)
 
 	if taxes_rate_list:
 		for key, value in taxes_rate_list.iteritems():
@@ -245,20 +239,16 @@ def tax_code_ref(qb_item, quickbooks_settings):
 							(select * from `tabQuickBooks SalesTaxRateList` where parent = {0}) as qbs 
 						where 
 							qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
-		# item_wise_tax[cstr(get_tax_account_head())] = flt(individual_item_tax[0]['tax_percent'])
 		item_tax_rate = get_tax_head_mapped_to_particular_account(individual_item_tax[0]['tax_head'], quickbooks_settings)
 		item_wise_tax[cstr(item_tax_rate)] = flt(individual_item_tax[0]['tax_percent'])
 	return item_wise_tax, cstr(individual_item_tax[0]['tax_head']) if individual_item_tax else '', flt(individual_item_tax[0]['tax_percent']) if individual_item_tax else 0
 
 def get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings):
 	""" fetch respective tax head from Tax Head Mappe table """
-	account_head_erpnext =frappe.db.get_value("Tax Head Mapper", {"tax_head_quickbooks": tax_head, \
+	account_head_erpnext = frappe.db.get_value("Tax Head Mapper", {"tax_head_quickbooks": tax_head, \
 			"parent": "Quickbooks Settings"}, "account_head_erpnext")
 	if not account_head_erpnext:
 		account_head_erpnext = quickbooks_settings.undefined_tax_account
-		# Default_company = frappe.defaults.get_defaults().get("company")
-		# Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
-		# account_head_erpnext = "Miscellaneous Expenses" +" - "+ Company_abbr
 	return account_head_erpnext
 
 def get_item_code(qb_item):
@@ -269,31 +259,31 @@ def get_item_code(qb_item):
 	return item_code
 
 
-def get_order_taxes(qb_orders):
-	taxes = []
-	Default_company = frappe.defaults.get_defaults().get("company")
-	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
+# def get_order_taxes(qb_orders):
+# 	taxes = []
+# 	Default_company = frappe.defaults.get_defaults().get("company")
+# 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
 
-	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
-		if qb_orders.get('GlobalTaxCalculation') == 'TaxExcluded' and qb_orders.get('TxnTaxDetail').get('TaxLine'):
-			taxes.append({
-				"charge_type": _("Actual"),
-				"account_head": get_tax_account_head(),
-				"description": _("Total Tax added from invoice"),
-				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
-			})
-	return taxes
+# 	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
+# 		if qb_orders.get('GlobalTaxCalculation') == 'TaxExcluded' and qb_orders.get('TxnTaxDetail').get('TaxLine'):
+# 			taxes.append({
+# 				"charge_type": _("Actual"),
+# 				"account_head": get_tax_account_head(),
+# 				"description": _("Total Tax added from invoice"),
+# 				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
+# 			})
+# 	return taxes
 
 
 
-def get_tax_account_head():
-	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \
-		{"parent": "Quickbooks Settings"}, "tax_account")
+# def get_tax_account_head():
+# 	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \
+# 		{"parent": "Quickbooks Settings"}, "tax_account")
 
-	if not tax_account:
-		frappe.throw("Tax Account not specified for QuickBooks Tax ")
+# 	if not tax_account:
+# 		frappe.throw("Tax Account not specified for QuickBooks Tax ")
 
-	return tax_account
+# 	return tax_account
 
 
 
