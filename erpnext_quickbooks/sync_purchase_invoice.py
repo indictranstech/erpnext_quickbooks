@@ -5,23 +5,20 @@ import json
 import ast
 from frappe.utils import flt, nowdate, cstr
 import requests.exceptions
-from .utils import make_quickbooks_log
-
+from .utils import make_quickbooks_log, pagination
 
 """Sync all the Purchase Invoice from Quickbooks to ERPNEXT"""
-
 def sync_pi_orders(quickbooks_obj):
 	quickbooks_purchase_invoice_list =[] 
-	purchase_invoice_query = """SELECT * FROM Bill""" 
-	qb_purchase_invoice = quickbooks_obj.query(purchase_invoice_query)
-	if qb_purchase_invoice['QueryResponse']:
-		get_qb_purchase_invoice =  qb_purchase_invoice['QueryResponse']
+	business_objects = "Bill"
+	get_qb_purchase_invoice =  pagination(quickbooks_obj, business_objects)
+	if get_qb_purchase_invoice:
 		sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
 def sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list):
 	company_name = frappe.defaults.get_defaults().get("company")
 	default_currency = frappe.db.get_value("Company" ,{"name":company_name},"default_currency")
-	for qb_orders in get_qb_purchase_invoice['Bill']:
+	for qb_orders in get_qb_purchase_invoice:
 		if valid_supplier_and_product(qb_orders):
 			try:
 				create_purchase_invoice_order(qb_orders, quickbooks_purchase_invoice_list, default_currency)
@@ -35,7 +32,6 @@ def valid_supplier_and_product(qb_orders):
 	supplier_id = qb_orders['VendorRef']['value'] 
 	if supplier_id:
 		if not frappe.db.get_value("Supplier", {"quickbooks_supp_id": supplier_id}, "name"):
-			# json_data = json.dumps(qb_orders['VendorRef'])
 			create_Supplier(qb_orders['VendorRef'], quickbooks_supplier_list = [])		
 	else:
 		raise _("supplier is mandatory to create order")
