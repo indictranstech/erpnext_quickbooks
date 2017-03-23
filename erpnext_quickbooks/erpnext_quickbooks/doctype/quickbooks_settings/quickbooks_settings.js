@@ -149,16 +149,28 @@ show_mandatory_field = function() {
 	// tax_mapper();
 }
 
+// tax_mapper = function() {
+// 	frappe.call({
+// 		method: "erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.quickbooks_tax_head",
+// 		callback: function(r) {
+// 			if(r.message){
+// 				for(var i=0; i<r.message.length ; i++){
+// 					child = frappe.model.add_child(cur_frm.doc, "Tax Head Mapper", "tax_head_mapper")
+// 					child.tax_head_quickbooks= r.message[i][0]
+// 				}
+// 					refresh_field("tax_head_mapper");
+// 				}
+// 			}
+// 		});
+// }
+
+
 tax_mapper = function() {
 	frappe.call({
 		method: "erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.quickbooks_tax_head",
 		callback: function(r) {
 			if(r.message){
-				for(var i=0; i<r.message.length ; i++){
-					child = frappe.model.add_child(cur_frm.doc, "Tax Head Mapper", "tax_head_mapper")
-					child.tax_head_quickbooks= r.message[i][0]
-				}
-					refresh_field("tax_head_mapper");
+					cur_frm.reload_doc();
 				}
 			}
 		});

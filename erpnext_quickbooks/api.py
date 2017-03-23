@@ -168,9 +168,9 @@ def sync_account_masters():
 	)
 	creates_qb_accounts_heads_to_erp_chart_of_accounts()
 	sync_taxagency(quickbooks_objects)
-	sync_tax_code(quickbooks_objects)
 	sync_tax_rate(quickbooks_objects)
+	sync_tax_code(quickbooks_objects)
 	sync_Account(quickbooks_objects)
-	frappe.db.sql("""update `tabSingles` set value = 1 where `doctype` = 'Quickbooks Settings' and `field` ='sync_master'""")
+	frappe.db.set_value("Quickbooks Settings", None, "sync_master", 1)
 	frappe.db.commit()
 	return True

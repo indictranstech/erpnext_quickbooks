@@ -71,16 +71,17 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 			"terms": term.get('terms')if term else ""
 
 		})
-
-		if not qb_orders.get('BillAddr').has_key("Long"):
-			if not (qb_orders.get('BillAddr').has_key("Country") or qb_orders.get('BillAddr').has_key("City")):
-				full_address, index = new_address_creation(qb_orders, si)
-				if index != False:
-					si.customer_address = create_address(full_address, si, qb_orders.get('BillAddr'), "Billing", index)
-					si.address_display = full_address
-				else:
-					si.customer_address = get_address_name(full_address)
-					si.address_display = full_address
+		
+		if qb_orders.get('BillAddr'):
+			if not qb_orders.get('BillAddr').has_key("Long"):
+				if not (qb_orders.get('BillAddr').has_key("Country") or qb_orders.get('BillAddr').has_key("City")):
+					full_address, index = new_address_creation(qb_orders, si)
+					if index != False:
+						si.customer_address = create_address(full_address, si, qb_orders.get('BillAddr'), "Billing", index)
+						si.address_display = full_address
+					else:
+						si.customer_address = get_address_name(full_address)
+						si.address_display = full_address
 
 		si.flags.ignore_mandatory = True
 		si.save(ignore_permissions=True)

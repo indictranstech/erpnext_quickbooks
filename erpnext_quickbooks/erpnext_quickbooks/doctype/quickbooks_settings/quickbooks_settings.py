@@ -81,4 +81,19 @@ def quickbooks_authentication_popup(consumer_key, consumer_secret):
 
 @frappe.whitelist()
 def quickbooks_tax_head():
-	return frappe.get_all('QuickBooks TaxRate', fields =["display_name"], as_list=1)
+	display_names = frappe.get_all('QuickBooks TaxRate', fields =["display_name"], as_list=1)
+	for tax_head_quickbooks in display_names:
+		create_tax_head_mapper(tax_head_quickbooks)
+	return True
+
+def create_tax_head_mapper(tax_head_quickbooks):
+	tax_head_mapper = frappe.new_doc("Tax Head Mapper")
+	tax_head_mapper.parent ="Quickbooks Settings"
+	tax_head_mapper.parenttype = "Quickbooks Settings"
+	tax_head_mapper.parentfield ="tax_head_mapper"
+	tax_head_mapper.tax_head_quickbooks = tax_head_quickbooks[0]
+	tax_head_mapper.flags.ignore_mandatory = True
+	tax_head_mapper.flags.ignore_permissions = 1
+	tax_head_mapper.insert()
+	frappe.db.commit()
+	# return tax_head_mapper.name
