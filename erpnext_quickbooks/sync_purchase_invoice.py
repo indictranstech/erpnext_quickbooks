@@ -11,7 +11,8 @@ from .utils import make_quickbooks_log, pagination
 def sync_pi_orders(quickbooks_obj):
 	quickbooks_purchase_invoice_list =[] 
 	business_objects = "Bill"
-	get_qb_purchase_invoice =  pagination(quickbooks_obj, business_objects)
+	# get_qb_purchase_invoice =  pagination(quickbooks_obj, business_objects)
+	get_qb_purchase_invoice =  [{"DocNumber": "SGDN1409012-6MN", "SyncToken": "2", "domain": "QBO", "APAccountRef": {"name": "Trade and other payables", "value": "35"}, "VendorRef": {"name": "Koehler Singapore Pte Ltd (SGD)", "value": "11"}, "GlobalTaxCalculation": "TaxExcluded", "TxnDate": "2014-09-30", "TotalAmt": 370.0, "ExchangeRate": 12, "CurrencyRef": {"name": "Singapore Dollar", "value": "SGD"}, "HomeBalance": 0, "LinkedTxn": [{"TxnId": "272", "TxnType": "BillPaymentCheck"}], "Id": "224", "sparse": False, "Line": [{"DetailType": "AccountBasedExpenseLineDetail", "Amount": 370.0, "Id": "1", "AccountBasedExpenseLineDetail": {"TaxCodeRef": {"value": "NON"}, "AccountRef": {"name": "Administrative Expenses", "value": "29"}, "BillableStatus": "NotBillable"}}, {"DetailType": "AccountBasedExpenseLineDetail", "Amount": 0, "Id": "2", "AccountBasedExpenseLineDetail": {"TaxCodeRef": {"value": "NON"}, "AccountRef": {"name": "Bank charges (SGD)", "value": "32"}, "BillableStatus": "NotBillable"}}], "Balance": 0, "DueDate": "2014-09-30", "MetaData": {"CreateTime": "2015-02-02T00:54:13-08:00", "LastUpdatedTime": "2015-10-01T06:18:19-07:00"}}]
 	if get_qb_purchase_invoice:
 		sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
@@ -107,7 +108,7 @@ def get_individual_count_based_expense_line(qb_orders, order_items, quickbooks_s
 			taxes_rate_list = {}
 			account_head_list = []
 			for i in get_order_items(qb_orders, order_items, quickbooks_settings, stock_item):
-				account_head =json.loads(i['item_tax_rate']).keys()[0]
+				account_head =json.loads(i['item_tax_rate']).keys()[0] if json.loads(i['item_tax_rate']).keys() else ''
 				if account_head in set(account_head_list) and float(i['quickbooks__tax_code_value']) != 0.0:
 					taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 				elif i['quickbooks__tax_code_value'] != 0:
@@ -132,7 +133,7 @@ def calculate_tax_amount(qb_orders, order_items, quickbooks_settings, stock_item
 	taxes_rate_list = {}
 	account_head_list = set()
 	for i in get_order_items(qb_orders, order_items, quickbooks_settings, stock_item):
-		account_head =json.loads(i['item_tax_rate']).keys()[0]
+		account_head =json.loads(i['item_tax_rate']).keys()[0] if json.loads(i['item_tax_rate']).keys() else ''
 		if account_head in account_head_list and float(i['quickbooks__tax_code_value']) != 0.0:
 			taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 		elif i['quickbooks__tax_code_value'] != 0:
@@ -177,7 +178,7 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings, stock_i
 			account_tax_details = account_based_expense_line_detail(qb_orders, order_items, quickbooks_settings)
 
 			for index,i in enumerate(account_tax_details):
-				account_heads =json.loads(i['item_tax_rate']).keys()[0]
+				account_heads =json.loads(i['item_tax_rate']).keys()[0] if json.loads(i['item_tax_rate']).keys() else ''
 
 				if account_heads in set(account_head_tax_list) and float(i['quickbooks__tax_code_value']) != 0.0:
 					account_expenses_tax[account_heads] += float(i['quickbooks__tax_code_value']*i['rate']*1/100)
@@ -199,6 +200,7 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings, stock_i
 	return taxes
 
 def get_order_items(qb_orders, order_items, quickbooks_settings, stock_item):
+	# print qb_orders
 	"""
 	Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks
 	PI (Bill) : During the creation of PI (Bill) in ERPNext from QuickBooks need to handle 3 scenario , 
@@ -266,16 +268,17 @@ def item_based_expense_line_detail_tax_code_ref(qb_orders,qb_item, quickbooks_se
 	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
 		if qb_item.get('ItemBasedExpenseLineDetail').get('TaxCodeRef'):
 			tax_code_id1 = qb_item.get('ItemBasedExpenseLineDetail').get('TaxCodeRef').get('value') if qb_item.get('ItemBasedExpenseLineDetail') else ''
-			individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
-							from 
-								`tabQuickBooks TaxRate` as qbr,
-								(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
-							where 
-								qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
-			tax_head = individual_item_tax[0]['tax_head']
-			tax_percent = flt(individual_item_tax[0]['tax_percent'])
-			item_tax_rate = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
-			item_wise_tax[cstr(item_tax_rate)] = tax_percent
+			if not tax_code_id1 == 'NON':
+				individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
+								from 
+									`tabQuickBooks TaxRate` as qbr,
+									(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
+								where 
+									qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
+				tax_head = individual_item_tax[0]['tax_head']
+				tax_percent = flt(individual_item_tax[0]['tax_percent'])
+				item_tax_rate = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
+				item_wise_tax[cstr(item_tax_rate)] = tax_percent
 	return item_wise_tax, tax_head, tax_percent 
 
 def account_based_expense_line_detail(qb_orders, order_items, quickbooks_settings):
@@ -309,16 +312,17 @@ def account_based_expense_line_detail_tax_code_ref(qb_orders, qb_item, quickbook
 	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
 		if qb_item.get('AccountBasedExpenseLineDetail').get('TaxCodeRef'):
 			tax_code_id1 = qb_item.get('AccountBasedExpenseLineDetail').get('TaxCodeRef').get('value') if qb_item.get('AccountBasedExpenseLineDetail') else ''
-			individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
-							from 
-								`tabQuickBooks TaxRate` as qbr,
-								(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
-							where 
-								qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
-			tax_head = individual_item_tax[0]['tax_head']
-			tax_percent = flt(individual_item_tax[0]['tax_percent'])
-			item_tax_rate = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
-			item_wise_tax[cstr(item_tax_rate)] = tax_percent
+			if not tax_code_id1 == 'NON':
+				individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
+								from 
+									`tabQuickBooks TaxRate` as qbr,
+									(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
+								where 
+									qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
+				tax_head = individual_item_tax[0]['tax_head']
+				tax_percent = flt(individual_item_tax[0]['tax_percent'])
+				item_tax_rate = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
+				item_wise_tax[cstr(item_tax_rate)] = tax_percent
 	return item_wise_tax, tax_head, tax_percent
 
 def get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings):
