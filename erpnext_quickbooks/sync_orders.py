@@ -185,7 +185,7 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings):
 		account_head_list = set()
 
 		for i in get_order_items(order_items, quickbooks_settings):
-			account_head =json.loads(i['item_tax_rate']).keys()[0]
+			account_head =json.loads(i['item_tax_rate']).keys()[0] if json.loads(i['item_tax_rate']).keys() else '' 
 			if account_head in account_head_list and i['quickbooks__tax_code_value'] != 0:
 				taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 			elif i['quickbooks__tax_code_value'] != 0:

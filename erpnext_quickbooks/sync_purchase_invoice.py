@@ -11,8 +11,7 @@ from .utils import make_quickbooks_log, pagination
 def sync_pi_orders(quickbooks_obj):
 	quickbooks_purchase_invoice_list =[] 
 	business_objects = "Bill"
-	# get_qb_purchase_invoice =  pagination(quickbooks_obj, business_objects)
-	get_qb_purchase_invoice =  [{"DocNumber": "SGDN1409012-6MN", "SyncToken": "2", "domain": "QBO", "APAccountRef": {"name": "Trade and other payables", "value": "35"}, "VendorRef": {"name": "Koehler Singapore Pte Ltd (SGD)", "value": "11"}, "GlobalTaxCalculation": "TaxExcluded", "TxnDate": "2014-09-30", "TotalAmt": 370.0, "ExchangeRate": 12, "CurrencyRef": {"name": "Singapore Dollar", "value": "SGD"}, "HomeBalance": 0, "LinkedTxn": [{"TxnId": "272", "TxnType": "BillPaymentCheck"}], "Id": "224", "sparse": False, "Line": [{"DetailType": "AccountBasedExpenseLineDetail", "Amount": 370.0, "Id": "1", "AccountBasedExpenseLineDetail": {"TaxCodeRef": {"value": "NON"}, "AccountRef": {"name": "Administrative Expenses", "value": "29"}, "BillableStatus": "NotBillable"}}, {"DetailType": "AccountBasedExpenseLineDetail", "Amount": 0, "Id": "2", "AccountBasedExpenseLineDetail": {"TaxCodeRef": {"value": "NON"}, "AccountRef": {"name": "Bank charges (SGD)", "value": "32"}, "BillableStatus": "NotBillable"}}], "Balance": 0, "DueDate": "2014-09-30", "MetaData": {"CreateTime": "2015-02-02T00:54:13-08:00", "LastUpdatedTime": "2015-10-01T06:18:19-07:00"}}]
+	get_qb_purchase_invoice =  pagination(quickbooks_obj, business_objects)
 	if get_qb_purchase_invoice:
 		sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
@@ -74,7 +73,6 @@ def create_purchase_invoice(qb_orders, quickbooks_settings, quickbooks_purchase_
 			"tc_name": term.get('name') if term else "",
 			"terms": term.get('terms')if term else ""
 		})
-		
 		pi.flags.ignore_mandatory = True
 		pi.save(ignore_permissions=True)
 		pi.submit()
@@ -200,7 +198,6 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings, stock_i
 	return taxes
 
 def get_order_items(qb_orders, order_items, quickbooks_settings, stock_item):
-	# print qb_orders
 	"""
 	Get all the 'Items details' && 'Account details' from the Purachase Invoice(Bill) from the quickbooks
 	PI (Bill) : During the creation of PI (Bill) in ERPNext from QuickBooks need to handle 3 scenario , 
