@@ -44,7 +44,7 @@ def sync_qb_journal_entry_against_si(get_payment_received):
 						request_data=recived_payment, exception=True)
 
 def create_journal_entry_against_si(recived_payment, quickbooks_settings):
-	if frappe.db.get_value("Sales invoice", {"quickbooks_invoce_id": recived_payment.get('qb_si_id')}, "name"):
+	if frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": recived_payment.get('qb_si_id')}, "name"):
 		row = validate_oustanding_amount_si(recived_payment)
 		qb_account_name = frappe.db.get_value("Account", {"quickbooks_account_id": recived_payment.get('qb_account_id')}, "name")
 		if row.get('name'):
