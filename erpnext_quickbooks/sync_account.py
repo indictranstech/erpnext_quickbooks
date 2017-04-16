@@ -44,6 +44,10 @@ def create_account(qb_account, quickbooks_account_list, quickbooks_settings, Com
 		account.account_name = str(qb_account.get('Name')) + " - " + "qb"
 		account.is_group = False
 		account.parent_account = parent_account
+		if qb_account.get('AccountType') == "Accounts Receivable":
+			account.account_type = _('Receivable')
+		elif qb_account.get('AccountType') == "Accounts Payable":
+			account.account_type = _('Payable')
 		account.root_type = root_type
 		account.account_currency = qb_account.get('CurrencyRef').get('value')
 		account.company = quickbooks_settings.select_company
