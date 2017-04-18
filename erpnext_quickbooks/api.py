@@ -21,6 +21,9 @@ from .sync_taxcode import *
 from .sync_taxagency import *
 from .sync_taxrate import *
 from .sync_term import *
+from .sync_expenses import *
+from .sync_credit_note import *
+from .sync_supplier_credit import *
 
 
 QUICKBOOKS_CLIENT_KEY = ""
@@ -109,19 +112,24 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	)
 	frappe.db.set_value("Quickbooks Settings", None, "last_sync_datetime", frappe.utils.now())
 	sync_taxagency(quickbooks_obj)
-	sync_tax_code(quickbooks_obj)
 	sync_tax_rate(quickbooks_obj)
+	sync_tax_code(quickbooks_obj)
+	sync_Account(quickbooks_obj)
 	sync_customers(quickbooks_obj)
 	sync_suppliers(quickbooks_obj)
 	sync_terms(quickbooks_obj)
 	create_Employee(quickbooks_obj)
 	sync_items(quickbooks_obj)
-	sync_Account(quickbooks_obj)
+	
 	sync_pi_orders(quickbooks_obj)
-	sync_si_orders(quickbooks_obj)
-
 	sync_pi_payment(quickbooks_obj)
+	sync_supplier_credits(quickbooks_obj)
+	
+	sync_si_orders(quickbooks_obj)
 	sync_si_payment(quickbooks_obj)
+	sync_credit_notes(quickbooks_obj)
+	sync_expenses(quickbooks_obj)
+
 	sync_entry(quickbooks_obj)
 
 def validate_quickbooks_settings(quickbooks_settings):

@@ -29,7 +29,8 @@ def validate_si_payment(get_qb_payment):
 					'Amount': line.get('Amount')*entries.get('ExchangeRate'),
 					'TxnDate': entries.get('TxnDate'),
 					'qb_account_id': entries.get('DepositToAccountRef').get('value'),
-					'qb_si_id':line.get('LinkedTxn')[0].get('TxnId')
+					'qb_si_id':line.get('LinkedTxn')[0].get('TxnId'),
+					'paid_amount': line.get('Amount')
 					})
 	return recived_payment
 
@@ -43,35 +44,67 @@ def sync_qb_journal_entry_against_si(get_payment_received):
  			make_quickbooks_log(title=e.message, status="Error", method="sync_qb_journal_entry_against_si", message=frappe.get_traceback(),
 						request_data=recived_payment, exception=True)
 
+
 def create_journal_entry_against_si(recived_payment, quickbooks_settings):
-	if frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": recived_payment.get('qb_si_id')}, "name"):
-		row = validate_oustanding_amount_si(recived_payment)
-		qb_account_name = frappe.db.get_value("Account", {"quickbooks_account_id": recived_payment.get('qb_account_id')}, "name")
-		if row.get('name'):
-			si_je = get_payment_entry_against_invoice("Sales Invoice", row.get('name'), amount=row.get('amount'), debit_in_account_currency=row.get('debit_in_account_currency'), journal_entry=False, bank_account=qb_account_name)
-			si_je = frappe.get_doc(si_je)
-			si_je.quickbooks_journal_entry_id = recived_payment.get('Id')
-			si_je.naming_series = "SI-JV-Quickbooks-"
-			si_je.voucher_type = _("Journal Entry")
-			si_je.posting_date = recived_payment.get('TxnDate')
-			if not si_je.difference ==0.0:
-				create_diff_entry(si_je, quickbooks_settings)
-			si_je.save()
-			si_je.submit()
-			frappe.db.commit()
+	invoice_name =frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": recived_payment.get('qb_si_id')}, "name")
+	if invoice_name:
+		ref_doc = frappe.get_doc("Sales Invoice", invoice_name)
+		si_je = frappe.get_doc({
+			"doctype": "Journal Entry",
+			"naming_series" : "SI-JV-Quickbooks-",
+			"quickbooks_journal_entry_id" : recived_payment.get('Id'),
+			"voucher_type" : _("Journal Entry"),
+			"posting_date" : recived_payment.get('TxnDate'),
+			"multi_currency": 1
+		})
+		get_journal_entry_account(si_je, "Sales Invoice", recived_payment, ref_doc, quickbooks_settings)
+		# print si_je, "---------------"
+		# data = si_je.accounts
+		# for i in data:
+		# 	print i.__dict__
+		# print "\n\n"		
+		# print "\n"
+		si_je.save()
+		si_je.submit()
+		frappe.db.commit()
 
-def validate_oustanding_amount_si(recived_payment):
-	"""validate outstanding amount"""
-	accounts_details = {}
-	accounts_details['amount'] = recived_payment.get('Amount')
-	accounts_details['debit_in_account_currency'] = recived_payment.get('Amount')
-	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": recived_payment.get('qb_si_id')}, ["name","outstanding_amount"],as_dict=1)
-	if recived_payment.get('Amount') > si.get('outstanding_amount'):
-		accounts_details['amount'] = si.get('outstanding_amount')
-	accounts_details['name'] = si.get('name')
-	return accounts_details
+def get_journal_entry_account(si_je, doctype , recived_payment, ref_doc, quickbooks_settings):
+	accounts_entry(si_je, doctype, recived_payment, ref_doc, quickbooks_settings)
 
 
+def accounts_entry(si_je, doctype, recived_payment, ref_doc, quickbooks_settings):
+	append_row_credit_detail(si_je= si_je, doctype= doctype, recived_payment= recived_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
+	append_row_debit_detail(si_je= si_je, recived_payment = recived_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
+
+def append_row_credit_detail(si_je= None, doctype= None, recived_payment = None, ref_doc=None, quickbooks_settings= None):
+	# print recived_payment.get('ExchangeRate'), "00000000000000000000000000000000000000000000000000000000000000000000000000000"
+	account = si_je.append("accounts", {})
+	account.account = ref_doc.debit_to
+	account.party_type =  "Customer"
+	account.party = ref_doc.customer_name
+	account.is_advance = "No"
+	account.exchange_rate = recived_payment.get('ExchangeRate')
+	account.credit = flt(recived_payment.get("Amount") , account.precision("credit"))
+	account.credit_in_account_currency = flt(recived_payment.get("paid_amount") , account.precision("credit_in_account_currency"))
+	account.reference_type = doctype
+	account.reference_name = ref_doc.name
+
+
+def append_row_debit_detail(si_je= None, recived_payment = None, ref_doc=None, quickbooks_settings= None):
+	company_name = quickbooks_settings.select_company
+	company_currency = frappe.db.get_value("Company", {"name": company_name}, "default_currency")
+
+	account = si_je.append("accounts", {})
+	account_ref = get_account_detail(recived_payment.get('qb_account_id'))
+	account.account = account_ref.get('name')
+	if account_ref.get('account_currency') == company_currency:
+		account.exchange_rate = 1
+		account.debit_in_account_currency = flt(recived_payment.get("paid_amount") * recived_payment.get('ExchangeRate') , account.precision("debit_in_account_currency"))
+	else:
+		account.exchange_rate = recived_payment.get('ExchangeRate')
+		account.debit_in_account_currency = flt(recived_payment.get("paid_amount") , account.precision("debit_in_account_currency"))
+
+	account.is_advance = "No"
 
 
 """Important code to fetch payment done againt purchase invoice and create journal Entry against that PI""" 
@@ -99,7 +132,8 @@ def validate_pi_payment(get_qb_billpayment):
 					"TxnDate" : entries.get('TxnDate'),
 					"PayType" :entries.get('PayType'),
 					"qb_account_id": entries.get('CheckPayment').get('BankAccountRef').get('value'),
-					"qb_pi_id": linked_txn.get('LinkedTxn')[0].get('TxnId')
+					"qb_pi_id": linked_txn.get('LinkedTxn')[0].get('TxnId'),
+					'paid_amount': linked_txn.get('Amount')
 					})
 	return paid_pi
 
@@ -114,40 +148,62 @@ def sync_qb_journal_entry_against_pi(get_bill_pi):
 						request_data=bill_payment, exception=True)
 
 
-
 def create_journal_entry_against_pi(bill_payment, quickbooks_settings):
-	if frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": bill_payment.get('qb_pi_id')}, "name"):
-		row = validate_oustanding_amount(bill_payment)
-		qb_account_name = frappe.db.get_value("Account", {"quickbooks_account_id": bill_payment.get('qb_account_id')}, "name")
-		if bill_payment['PayType'] == "Check" and row.get('name'):
-			pi_je = get_payment_entry_against_invoice("Purchase Invoice", row.get('name'), amount=row.get('amount'), debit_in_account_currency=row.get('debit_in_account_currency'), journal_entry=False, bank_account=qb_account_name)
-			pi_je = frappe.get_doc(pi_je)
-			pi_je.quickbooks_journal_entry_id = bill_payment.get('Id')
-			pi_je.naming_series = "PI-JV-Quickbooks-"
-			pi_je.voucher_type = _("Journal Entry")
-			pi_je.posting_date = bill_payment.get('TxnDate')
-			if not pi_je.difference ==0.0:
-				create_diff_entry(pi_je, quickbooks_settings)
-			pi_je.save()
-			pi_je.submit()
-			frappe.db.commit()
-
-def validate_oustanding_amount(bill_payment):
-	"""validate outstanding amount"""
-	accounts_details = {}
-	accounts_details['amount'] = bill_payment.get('Amount')
-	accounts_details['debit_in_account_currency'] = bill_payment.get('Amount')
-	pi = frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": bill_payment.get('qb_pi_id')}, ["name","outstanding_amount"],as_dict=1)
-	if bill_payment.get('Amount') > pi.get('outstanding_amount'):
-		accounts_details['amount'] = pi.get('outstanding_amount')
-	accounts_details['name'] = pi.get('name')
-	return accounts_details
+	invoice_name =frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": bill_payment.get('qb_pi_id')}, "name")
+	if invoice_name:
+		ref_doc = frappe.get_doc("Purchase Invoice", invoice_name)
+		pi_je = frappe.get_doc({
+			"doctype": "Journal Entry",
+			"naming_series" : "PI-JV-Quickbooks-",
+			"quickbooks_journal_entry_id" : bill_payment.get('Id'),
+			"voucher_type" : _("Journal Entry"),
+			"posting_date" : bill_payment.get('TxnDate'),
+			"multi_currency": 1
+		})
+		get_journal_entry_account_pi(pi_je, "Purchase Invoice", bill_payment, ref_doc, quickbooks_settings)
+		pi_je.save()
+		pi_je.submit()
+		frappe.db.commit()
 
 
-def create_diff_entry(pi_je, quickbooks_settings):
-	debit = abs(pi_je.difference) if pi_je.difference < 0  else ''
-	credit = abs(pi_je.difference) if pi_je.difference > 0  else ''
+
+
+def get_journal_entry_account_pi(pi_je, doctype , bill_payment, ref_doc, quickbooks_settings):
+	accounts_entry_pi(pi_je, doctype, bill_payment, ref_doc, quickbooks_settings)
+
+
+def accounts_entry_pi(pi_je, doctype, bill_payment, ref_doc, quickbooks_settings):
+	append_row_debit_detail_pi(pi_je= pi_je, doctype= doctype, bill_payment= bill_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
+	append_row_credit_detail_pi(pi_je= pi_je, bill_payment = bill_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
+
+def append_row_debit_detail_pi(pi_je= None, doctype= None, bill_payment = None, ref_doc=None, quickbooks_settings= None):
 	account = pi_je.append("accounts", {})
-	account.account = quickbooks_settings.profit_loss_account
-	account.debit_in_account_currency = debit
-	account.credit_in_account_currency = credit
+	account.account = ref_doc.credit_to
+	account.party_type =  "Supplier"
+	account.party = ref_doc.supplier_name
+	account.is_advance = "No"
+	account.exchange_rate = bill_payment.get('ExchangeRate')
+	account.debit = flt(bill_payment.get("Amount") , account.precision("debit"))
+	account.debit_in_account_currency = flt(bill_payment.get("paid_amount") , account.precision("debit_in_account_currency"))
+	account.reference_type = doctype
+	account.reference_name = ref_doc.name
+
+def get_account_detail(quickbooks_account_id):
+	return frappe.db.get_value("Account", {"quickbooks_account_id": quickbooks_account_id}, ["name", "account_currency"], as_dict=1)
+
+def append_row_credit_detail_pi(pi_je= None, bill_payment = None, ref_doc=None, quickbooks_settings= None):
+	company_name = quickbooks_settings.select_company
+	company_currency = frappe.db.get_value("Company", {"name": company_name}, "default_currency")
+
+	account = pi_je.append("accounts", {})
+	account_ref = get_account_detail(bill_payment.get('qb_account_id'))
+	if account_ref.get('account_currency') == company_currency:
+		account.exchange_rate = 1
+		account.credit_in_account_currency = flt(bill_payment.get("paid_amount") * bill_payment.get('ExchangeRate'), account.precision("credit_in_account_currency"))
+	else:
+		account.exchange_rate = bill_payment.get('ExchangeRate')
+		account.credit_in_account_currency = flt(bill_payment.get("paid_amount") , account.precision("credit_in_account_currency"))
+
+	account.account = account_ref.get('name')
+	account.is_advance = "No"
+	

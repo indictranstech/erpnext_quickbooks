@@ -8,98 +8,97 @@ from .utils import make_quickbooks_log, pagination
 from pyqb.quickbooks.batch import batch_create, batch_delete
 
 """Sync all the Sales Invoice from Quickbooks to ERPNEXT"""
-def sync_si_orders(quickbooks_obj): 
+def sync_credit_notes(quickbooks_obj): 
 	"""Fetch invoice data from QuickBooks"""
-	quickbooks_invoice_list = [] 
-	business_objects = "Invoice"
-	get_qb_invoice =  pagination(quickbooks_obj, business_objects)
-	if get_qb_invoice:
-		sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
+	quickbooks_credit_notes_list = [] 
+	business_objects = "CreditMemo"
+	get_qb_credit_notes =  pagination(quickbooks_obj, business_objects)
+	if get_qb_credit_notes:
+		sync_qb_credit_notes(get_qb_credit_notes, quickbooks_credit_notes_list)
 
-def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
+def sync_qb_credit_notes(get_qb_credit_notes, quickbooks_credit_notes_list):
 	company_name = frappe.defaults.get_defaults().get("company")
 	default_currency = frappe.db.get_value("Company" ,{"name":company_name},"default_currency")
-	for qb_orders in get_qb_invoice:
-		if valid_customer_and_product(qb_orders):
+	for qb_credit_note in get_qb_credit_notes:
+		if valid_customer_and_product(qb_credit_note):
 			try:
-				create_order(qb_orders, quickbooks_invoice_list, default_currency)
+				create_note(qb_credit_note, quickbooks_credit_notes_list, default_currency)
 			except Exception, e:
-				make_quickbooks_log(title=e.message, status="Error", method="sync_qb_si_orders", message=frappe.get_traceback(),
-						request_data=qb_orders, exception=True)
+				make_quickbooks_log(title=e.message, status="Error", method="sync_qb_credit_notes", message=frappe.get_traceback(),
+						request_data=qb_credit_note, exception=True)
 					
-def valid_customer_and_product(qb_orders):
+def valid_customer_and_product(qb_credit_note):
 	""" Fetch valid_customer data from ERPNEXT and store in ERPNEXT """ 
 	from .sync_customers import create_customer
-	customer_id = qb_orders['CustomerRef'].get('value') 
+	customer_id = qb_credit_note['CustomerRef'].get('value') 
 	if customer_id:
 		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": customer_id}, "name"):
-			create_customer(qb_orders['CustomerRef'], quickbooks_customer_list = [])
+			create_customer(qb_credit_note['CustomerRef'], quickbooks_customer_list = [])
 	else:
 		raise _("Customer is mandatory to create order")
 	return True
 
-def create_order(qb_orders, quickbooks_invoice_list, default_currency):
+def create_note(qb_credit_note, quickbooks_credit_notes_list, default_currency):
 	""" Store Sales Invoice in ERPNEXT """
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
-	create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, default_currency)
+	create_credit_note(qb_credit_note, quickbooks_settings, quickbooks_credit_notes_list, default_currency)
 
-def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list, default_currency):
-	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": qb_orders.get("Id")}, "name")
-	term_id = qb_orders.get('SalesTermRef').get('value') if qb_orders.get('SalesTermRef') else ""
+def create_credit_note(qb_credit_note, quickbooks_settings, quickbooks_credit_notes_list, default_currency):
+	si = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": str(qb_credit_note.get("Id"))+"-"+"CN"}, "name")
+	term_id = qb_credit_note.get('SalesTermRef').get('value') if qb_credit_note.get('SalesTermRef') else ""
 	term = ""
 	if term_id:
 		term = frappe.db.get_value("Terms and Conditions", {"quickbooks_term_id": term_id}, ["name","terms"],as_dict=1)
 	if not si:
 		si = frappe.get_doc({
 			"doctype": "Sales Invoice",
-			"quickbooks_invoce_id" : qb_orders.get("Id"),
-			"naming_series": "SINV-",
-			"currency" : qb_orders.get("CurrencyRef").get('value') if qb_orders.get("CurrencyRef") else default_currency,
-			"conversion_rate" : qb_orders.get("ExchangeRate") if qb_orders.get("CurrencyRef") else 1,
-			"quickbooks_invoice_no" : qb_orders.get("DocNumber"),
-			"title": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
-			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"name"),
-			"posting_date": qb_orders.get('TxnDate'),
-			"due_date": qb_orders.get('DueDate'),
-			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_orders['CustomerRef'].get('value')},"territory"),
+			"quickbooks_invoce_id" : str(qb_credit_note.get("Id"))+"-"+"CN",
+			"naming_series": "CREDIT-NOTE-",
+			"currency" : qb_credit_note.get("CurrencyRef").get('value') if qb_credit_note.get("CurrencyRef") else default_currency,
+			"conversion_rate" : qb_credit_note.get("ExchangeRate") if qb_credit_note.get("CurrencyRef") else 1,
+			"quickbooks_invoice_no" : qb_credit_note.get("DocNumber"),
+			"title": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_credit_note['CustomerRef'].get('value')},"name"),
+			"customer": frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_credit_note['CustomerRef'].get('value')},"name"),
+			"posting_date": qb_credit_note.get('TxnDate'),
+			"due_date": qb_credit_note.get('DueDate'),
+			"territory" : frappe.db.get_value("Customer",{"quickbooks_cust_id":qb_credit_note['CustomerRef'].get('value')},"territory"),
 			"selling_price_list": quickbooks_settings.selling_price_list,
 			"ignore_pricing_rule": 1,
 			"update_stock": 1,
 			"apply_discount_on": "Net Total",
-			"items": get_order_items(qb_orders['Line'], quickbooks_settings),
-			"taxes": get_individual_item_tax(qb_orders, qb_orders['Line'], quickbooks_settings),
+			"items": get_order_items(qb_credit_note['Line'], quickbooks_settings),
+			"taxes": get_individual_item_tax(qb_credit_note, qb_credit_note['Line'], quickbooks_settings),
 			"tc_name": term.get('name') if term else "",
 			"terms": term.get('terms')if term else ""
 
 		})
 		
-		if qb_orders.get('BillAddr'):
-			if not qb_orders.get('BillAddr').has_key("Long"):
-				if not (qb_orders.get('BillAddr').has_key("Country") or qb_orders.get('BillAddr').has_key("City")):
-					full_address, index = new_address_creation(qb_orders, si)
+		if qb_credit_note.get('BillAddr'):
+			if not qb_credit_note.get('BillAddr').has_key("Long"):
+				if not (qb_credit_note.get('BillAddr').has_key("Country") or qb_credit_note.get('BillAddr').has_key("City")):
+					full_address, index = new_address_creation(qb_credit_note, si)
 					if index != False:
-						si.customer_address = create_address(full_address, si, qb_orders.get('BillAddr'), "Billing", index)
+						si.customer_address = create_address(full_address, si, qb_credit_note.get('BillAddr'), "Billing", index)
 						si.address_display = full_address
 					else:
 						si.customer_address = get_address_name(full_address)
 						si.address_display = full_address
 
-		set_debit_to(si, qb_orders, quickbooks_settings, default_currency)
-
 		si.flags.ignore_mandatory = True
 		si.save(ignore_permissions=True)
 		si.submit()
-		quickbooks_invoice_list.append(qb_orders.get("id"))
+		quickbooks_credit_notes_list.append(qb_credit_note.get("id"))
+
+
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+		cn = make_return_doc("Sales Invoice", si.name, target_doc=None)
+		cn.naming_series ="SINV-RET-"
+		cn.flags.ignore_mandatory = True
+		cn.save(ignore_permissions=True)
+		cn.submit()
+		
 		frappe.db.commit()	
-	return quickbooks_invoice_list
-
-
-def set_debit_to(si, qb_orders, quickbooks_settings, default_currency):
-	party_currency = qb_orders.get("CurrencyRef").get('value') if qb_orders.get("CurrencyRef") else default_currency
-	if party_currency:
-		debtors_account = frappe.db.get_value("Account", {"account_currency": party_currency, 'account_type': 'Receivable',\
-			"company": quickbooks_settings.select_company, "root_type": "Asset"}, "name")
-		si.debit_to = debtors_account
+	return quickbooks_credit_notes_list
 
 # def get_individual_item_tax(order_items, quickbooks_settings):
 # 	"""tax break for individual item from QuickBooks"""
@@ -119,15 +118,15 @@ def set_debit_to(si, qb_orders, quickbooks_settings, default_currency):
 # 				"tax_amount": tax_amount
 # 				})
 # 	return taxes
-# def new_address_creation(qb_orders, si):
+# def new_address_creation(qb_credit_note, si):
 # 	address_list = frappe.db.sql("select concat(address_line1,address_line2) as address from `tabAddress` where customer='{}'".format(si.customer), as_list=1)
 # 	customer_address_line_1_2 = [x[0] for x in address_list]
 # 	index =frappe.db.sql("select count(*) as count from `tabAddress` where customer = '{0}'".format(si.customer),as_dict=1)
 # 	type_of_address ="Billing"
-# 	if qb_orders.get('BillAddr'):
+# 	if qb_credit_note.get('BillAddr'):
 # 		address1 = []
 # 		full_address =''
-# 		bill_adress = qb_orders.get('BillAddr')
+# 		bill_adress = qb_credit_note.get('BillAddr')
 # 		for j in range(len(bill_adress)-1):
 # 			if 'Line'+str(j+1) != 'Line1':
 # 				address1.append(bill_adress['Line'+str(j+1)])
@@ -135,14 +134,14 @@ def set_debit_to(si, qb_orders, quickbooks_settings, default_currency):
 # 		if not full_address in customer_address_line_1_2:
 # 			return create_address(full_address, si, bill_adress, type_of_address, int(index[0]['count'])+1)
 
-def new_address_creation(qb_orders, si):
+def new_address_creation(qb_credit_note, si):
 	address_list = frappe.db.sql("select concat(address_line1,address_line2) as address from `tabAddress` where customer='{}'".format(si.customer), as_list=1)
 	customer_address_line = [x[0] for x in address_list]
 	index = frappe.db.sql("select count(*) as count from `tabAddress` where customer = '{0}'".format(si.customer),as_dict=1)
 	# type_of_address ="Billing"
-	if qb_orders.get('BillAddr'):
+	if qb_credit_note.get('BillAddr'):
 		address = []
-		bill_adress = qb_orders.get('BillAddr')
+		bill_adress = qb_credit_note.get('BillAddr')
 		for j in xrange(len(bill_adress)-1):
 			if 'Line'+str(j+1) != 'Line1':
 				address.append(bill_adress['Line'+str(j+1)])
@@ -188,10 +187,10 @@ def get_address_title_and_type(customer_name, type_of_address, index):
 
 
 
-def get_individual_item_tax(qb_orders, order_items, quickbooks_settings):
+def get_individual_item_tax(qb_credit_note, order_items, quickbooks_settings):
 	"""tax break for individual item from QuickBooks"""
 	taxes = []
-	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
+	if not qb_credit_note.get('GlobalTaxCalculation') == 'NotApplicable':
 		taxes_rate_list = {}
 		account_head_list = set()
 
@@ -304,121 +303,4 @@ def get_item_code(qb_item):
 	return item_code
 
 
-# def get_order_taxes(qb_orders):
-# 	taxes = []
-# 	Default_company = frappe.defaults.get_defaults().get("company")
-# 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
 
-# 	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
-# 		if qb_orders.get('GlobalTaxCalculation') == 'TaxExcluded' and qb_orders.get('TxnTaxDetail').get('TaxLine'):
-# 			taxes.append({
-# 				"charge_type": _("Actual"),
-# 				"account_head": get_tax_account_head(),
-# 				"description": _("Total Tax added from invoice"),
-# 				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
-# 			})
-# 	return taxes
-
-
-
-# def get_tax_account_head():
-# 	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \
-# 		{"parent": "Quickbooks Settings"}, "tax_account")
-
-# 	if not tax_account:
-# 		frappe.throw("Tax Account not specified for QuickBooks Tax ")
-
-# 	return tax_account
-
-
-
-
-from pyqb.quickbooks.batch import batch_create, batch_delete
-from pyqb.quickbooks.objects.invoice import Invoice
-from pyqb.quickbooks.objects.detailline import SaleItemLine, SalesItemLineDetail
-
-
-"""	Sync Invoices Records From ERPNext to QuickBooks """
-def sync_erp_sales_invoices(quickbooks_obj):
-	"""Receive Response From Quickbooks and Update quickbooks_invoce_id in Invoices"""
-	response_from_quickbooks = sync_erp_sales_invoices_to_quickbooks(quickbooks_obj)
-	if response_from_quickbooks:
-		try:
-			for response_obj in response_from_quickbooks.successes:
-				if response_obj:
-					frappe.db.sql("""UPDATE `tabSales Invoice` SET quickbooks_invoce_id = %s WHERE name ='%s'""" %(response_obj.Id, response_obj.DocNumber))
-					frappe.db.commit()
-				else:
-					raise _("Does not get any response from quickbooks")	
-		except Exception, e:
-			make_quickbooks_log(title=e.message, status="Error", method="sync_erp_sales_invoices", message=frappe.get_traceback(),
-				request_data=response_obj, exception=True)
-
-def sync_erp_sales_invoices_to_quickbooks(quickbooks_obj):
-	"""Sync ERPNext Invoice to QuickBooks"""
-	Sales_invoice_list = []
-	for erp_sales_invoice in erp_sales_invoice_data():
-		try:
-			if erp_sales_invoice:
-				create_erp_sales_invoice_to_quickbooks(erp_sales_invoice, Sales_invoice_list)
-			else:
-				raise _("Sales invoice does not exist in ERPNext")
-		except Exception, e:
-			if e.args[0] and e.args[0].startswith("402"):
-				raise e
-			else:
-				make_quickbooks_log(title=e.message, status="Error", method="sync_erp_sales_invoices_to_quickbooks", message=frappe.get_traceback(),
-					request_data=erp_sales_invoice, exception=True)
-	results = batch_create(Sales_invoice_list)
-	return results
-
-def erp_sales_invoice_data():
-	"""ERPNext Invoices Record"""
-	erp_sales_invoice = frappe.db.sql("""select `name` ,`customer_name`, `taxes_and_charges` from  `tabSales Invoice` where `quickbooks_invoce_id` is NULL and is_pos is FALSE and docstatus = 1""" ,as_dict=1)
-	return erp_sales_invoice
-
-def erp_sales_invoice_item_data(invoice_name):
-	"""ERPNext Invoice Items Record of Particular Invoice"""
-	erp_sales_invoice_item = frappe.db.sql("""SELECT `idx`, `description`, `rate`, `item_code`, `qty` from `tabSales Invoice Item` where parent = '%s'""" %(invoice_name), as_dict=1)
-	return erp_sales_invoice_item
-
-def create_erp_sales_invoice_to_quickbooks(erp_sales_invoice, Sales_invoice_list):
-	sales_invoice_obj = Invoice()
-	sales_invoice_obj.DocNumber = erp_sales_invoice.name
-	sales_invoice_item(sales_invoice_obj, erp_sales_invoice)
-	customer_ref(sales_invoice_obj, erp_sales_invoice)
-	if erp_sales_invoice.get('taxes_and_charges'):
-		sales_invoice_obj.GlobalTaxCalculation = "TaxExcluded"
-	else:
-		sales_invoice_obj.GlobalTaxCalculation = "NotApplicable"
-	sales_invoice_obj.save()
-	Sales_invoice_list.append(sales_invoice_obj)
-	return Sales_invoice_list		
-
-def customer_ref(sales_invoice_obj, erp_sales_invoice):
-	quickbooks_cust_id = frappe.db.get_value("Customer", {"name": erp_sales_invoice.get('customer_name')}, "quickbooks_cust_id")
-	sales_invoice_obj.CustomerRef = {"value": quickbooks_cust_id}
-
-def sales_invoice_item(sales_invoice_obj, erp_sales_invoice):
-	invoice_name = erp_sales_invoice.name
-	for invoice_item in erp_sales_invoice_item_data(invoice_name):
-		line = SaleItemLine()
-		line.LineNum = invoice_item.idx
-		line.Description = invoice_item.description
-		line.Amount = flt(invoice_item.rate) * flt(invoice_item.qty)
-		line.SalesItemLineDetail = SalesItemLineDetail()
-		line.SalesItemLineDetail.ItemRef = item_ref(invoice_item) 
-		line.SalesItemLineDetail.Qty = invoice_item.qty
-		line.SalesItemLineDetail.UnitPrice =invoice_item.rate
-		line.SalesItemLineDetail.TaxCodeRef = TaxCodeRef(erp_sales_invoice)
-		sales_invoice_obj.Line.append(line)
-		
-def item_ref(invoice_item):
-	quickbooks_item_id = frappe.db.get_value("Item", {"name": invoice_item.get('item_code')}, "quickbooks_item_id")
-	return {"value": quickbooks_item_id, "name": invoice_item.get('item_code')}
-
-def TaxCodeRef(erp_sales_invoice):
-	quickbooks_sales_tax_id = frappe.db.get_value("Sales Taxes and Charges Template", {"name": erp_sales_invoice.get('taxes_and_charges')}, "quickbooks_sales_tax_id")
-	# print quickbooks_sales_tax_id,""
-	# return {"value": quickbooks_sales_tax_id}
-	return {"value": "11"}

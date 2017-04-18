@@ -17,9 +17,11 @@ def sync_suppliers(quickbooks_obj):
 
 	
 def sync_qb_suppliers(get_qb_supplier, quickbooks_supplier_list):
+	# quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	for qb_supplier in get_qb_supplier:
 		if not frappe.db.get_value("Supplier", {"quickbooks_supp_id": qb_supplier.get('Id')}, "name"):
 			create_Supplier(qb_supplier, quickbooks_supplier_list)
+
 
 def create_Supplier(qb_supplier, quickbooks_supplier_list):
 	""" Store Supplier Data in ERPNEXT """ 
@@ -31,6 +33,7 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 			"supplier_name" : str(qb_supplier.get('DisplayName')) if qb_supplier.get('DisplayName')  else str(qb_supplier.get('name')),
 			"supplier_type" :  _("Distributor"),
 			"default_currency" : qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else '',
+			"accounts": get_party_account(qb_supplier)
 		})
 		supplier.flags.ignore_mandatory = True
 		supplier.insert()
@@ -48,6 +51,48 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 			make_quickbooks_log(title=e.message, status="Error", method="create_Supplier", message=frappe.get_traceback(),
 				request_data=qb_supplier, exception=True)
 	return quickbooks_supplier_list
+
+# def create_Supplier(qb_supplier, quickbooks_settings, quickbooks_supplier_list):
+# 	""" Store Supplier Data in ERPNEXT """ 
+# 	supplier = None
+# 	try:	
+# 		supplier = frappe.get_doc({
+# 			"doctype": "Supplier",
+# 			"quickbooks_supp_id": str(qb_supplier.get('Id')) if qb_supplier.get('Id')  else str(qb_supplier.get('value')),
+# 			"supplier_name" : str(qb_supplier.get('DisplayName')) if qb_supplier.get('DisplayName')  else str(qb_supplier.get('name')),
+# 			"supplier_type" :  _("Distributor"),
+# 			"default_currency" : qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else ''
+# 		})
+# 		# "accounts": get_party_account(qb_supplier, quickbooks_settings)
+# 		supplier.flags.ignore_mandatory = True
+# 		supplier.insert()
+
+# 		if supplier and qb_supplier.get('BillAddr'):
+# 			create_supplier_address(qb_supplier, supplier, qb_supplier.get("BillAddr"), "Billing", 1)
+		
+# 		frappe.db.commit()
+# 		quickbooks_supplier_list.append(supplier.quickbooks_supp_id)
+
+# 	except Exception, e:
+# 		if e.args[0] and e.args[0].startswith("402"):
+# 			raise e
+# 		else:
+# 			make_quickbooks_log(title=e.message, status="Error", method="create_Supplier", message=frappe.get_traceback(),
+# 				request_data=qb_supplier, exception=True)
+# 	return quickbooks_supplier_list
+
+def get_party_account(qb_supplier):
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	party_account = []
+	party_currency = qb_supplier.get('CurrencyRef').get('value') if qb_supplier.get('CurrencyRef') else ''
+	creditors_account = frappe.db.get_value("Account", {"account_currency": party_currency, 'account_type': 'Payable',\
+	"company": quickbooks_settings.select_company ,"root_type": "Liability"}, "name")
+	if party_currency and creditors_account:
+		party_account.append({
+			"company": quickbooks_settings.select_company,
+			"account": creditors_account
+		})
+	return party_account
 
 def create_supplier_address(qb_supplier, supplier, address, type_of_address, index):
 	address_title, address_type = get_address_title_and_type(supplier.supplier_name, type_of_address, index)
