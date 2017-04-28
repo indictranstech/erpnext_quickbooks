@@ -13,7 +13,6 @@ def sync_si_orders(quickbooks_obj):
 	quickbooks_invoice_list = [] 
 	business_objects = "Invoice"
 	get_qb_invoice =  pagination(quickbooks_obj, business_objects)
-	print get_qb_invoice, "-----------------------------"
 	if get_qb_invoice:
 		sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
 

@@ -13,7 +13,6 @@ def sync_pi_orders(quickbooks_obj):
 	business_objects = "Bill"
 	get_qb_purchase_invoice =  pagination(quickbooks_obj, business_objects)
 	if get_qb_purchase_invoice:
-		print get_qb_purchase_invoice, "0000000000000000000000000000"
 		sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list)
 
 def sync_qb_pi_orders(get_qb_purchase_invoice, quickbooks_purchase_invoice_list):
