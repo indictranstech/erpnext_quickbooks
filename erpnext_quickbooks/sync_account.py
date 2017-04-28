@@ -29,13 +29,7 @@ def create_account(qb_account, quickbooks_account_list, quickbooks_settings, Com
 	account_type = None
 	root_type = None
 	parent_account = None
-	# Default_company = frappe.defaults.get_defaults().get("company")
-	# Company_abbr = frappe.db.get_value("Company", {"name": Default_company}, "abbr")
-	
-	# if Default_company == 'Singapore':
-	# 	parent_account, root_type  = accounts_mapper_for_singapore(qb_account, Company_abbr)
-	# else:
-	# 	parent_account, root_type  = account_mapper_for_all_country(qb_account, Company_abbr)
+
 	parent_account, root_type  = account_mapper_all_country(qb_account, Company_abbr)
 	
 	try:	
@@ -44,10 +38,7 @@ def create_account(qb_account, quickbooks_account_list, quickbooks_settings, Com
 		account.account_name = str(qb_account.get('Name')) + " - " + "qb"
 		account.is_group = False
 		account.parent_account = parent_account
-		if qb_account.get('AccountType') == "Accounts Receivable":
-			account.account_type = _('Receivable')
-		elif qb_account.get('AccountType') == "Accounts Payable":
-			account.account_type = _('Payable')
+		set_account_type(account, qb_account)
 		account.root_type = root_type
 		account.account_currency = qb_account.get('CurrencyRef').get('value')
 		account.company = quickbooks_settings.select_company
@@ -66,8 +57,17 @@ def create_account(qb_account, quickbooks_account_list, quickbooks_settings, Com
 	
 	return quickbooks_account_list
 
-def quickbooks_accounts_head(quickbooks_settings):
+def set_account_type(account, qb_account):
+	"Set account type according to Quickbooks Accounts"
+	if qb_account.get('AccountType') == "Accounts Receivable":
+		account.account_type = _('Receivable')
+	elif qb_account.get('AccountType') == "Accounts Payable":
+		account.account_type = _('Payable')
+	elif qb_account.get('AccountType') == "Bank":
+		account.account_type = _('Bank')
 
+def quickbooks_accounts_head(quickbooks_settings):
+	"Create account Head According to Quickbooks charts of accounts"
 	chart_of_accounts = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "chart_of_accounts")
 	if chart_of_accounts == "Singapore - F&B Chart of Accounts" or chart_of_accounts == "Singapore - Chart of Accounts":
 		category_type = {'Asset, Assets':['Fixed assets','Non-current assets','Accounts receivables (Debtors)','Current assets', 'Bank'],\
@@ -80,7 +80,6 @@ def quickbooks_accounts_head(quickbooks_settings):
 					'Income, Income':['Other Income'],\
 					'Expense, Expenses':['Other Expenses','Cost of Goods Solds']}
 	return category_type
-
 
 def delete_chart_of_accounts(quickbooks_settings, Company_abbr):
 	# quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")

@@ -13,6 +13,7 @@ def sync_si_orders(quickbooks_obj):
 	quickbooks_invoice_list = [] 
 	business_objects = "Invoice"
 	get_qb_invoice =  pagination(quickbooks_obj, business_objects)
+	print get_qb_invoice, "-----------------------------"
 	if get_qb_invoice:
 		sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
 
@@ -95,51 +96,19 @@ def create_sales_invoice(qb_orders, quickbooks_settings, quickbooks_invoice_list
 
 
 def set_debit_to(si, qb_orders, quickbooks_settings, default_currency):
+	"Set debit account"
 	party_currency = qb_orders.get("CurrencyRef").get('value') if qb_orders.get("CurrencyRef") else default_currency
 	if party_currency:
-		debtors_account = frappe.db.get_value("Account", {"account_currency": party_currency, 'account_type': 'Receivable',\
-			"company": quickbooks_settings.select_company, "root_type": "Asset"}, "name")
+		debtors_account = frappe.db.get_value("Account", {"account_currency": party_currency, "quickbooks_account_id": ["!=",""], 'account_type': 'Receivable',\
+			"company": quickbooks_settings.select_company, "root_type": "Asset", "is_group": "0"}, "name")
 		si.debit_to = debtors_account
 
-# def get_individual_item_tax(order_items, quickbooks_settings):
-# 	"""tax break for individual item from QuickBooks"""
-# 	taxes = []
-# 	Default_company = frappe.defaults.get_defaults().get("company")
-# 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
-# 	tax_amount = 0
-# 	for i in get_order_items(order_items, quickbooks_settings):
-# 		if i['quickbooks__tax_code_value']:
-# 			tax_amount = flt(tax_amount) + (flt(i['quickbooks__tax_code_value']) * (i['qty'] *i['rate']))/100
-# 	if tax_amount:
-# 		taxes.append({
-# 				"charge_type": _("On Net Total"),
-# 				"account_head": get_tax_account_head(),
-# 				"description": _("Total Tax added from invoice"),
-# 				"rate": 0,
-# 				"tax_amount": tax_amount
-# 				})
-# 	return taxes
-# def new_address_creation(qb_orders, si):
-# 	address_list = frappe.db.sql("select concat(address_line1,address_line2) as address from `tabAddress` where customer='{}'".format(si.customer), as_list=1)
-# 	customer_address_line_1_2 = [x[0] for x in address_list]
-# 	index =frappe.db.sql("select count(*) as count from `tabAddress` where customer = '{0}'".format(si.customer),as_dict=1)
-# 	type_of_address ="Billing"
-# 	if qb_orders.get('BillAddr'):
-# 		address1 = []
-# 		full_address =''
-# 		bill_adress = qb_orders.get('BillAddr')
-# 		for j in range(len(bill_adress)-1):
-# 			if 'Line'+str(j+1) != 'Line1':
-# 				address1.append(bill_adress['Line'+str(j+1)])
-# 		full_address = " ".join(address1)
-# 		if not full_address in customer_address_line_1_2:
-# 			return create_address(full_address, si, bill_adress, type_of_address, int(index[0]['count'])+1)
 
 def new_address_creation(qb_orders, si):
 	address_list = frappe.db.sql("select concat(address_line1,address_line2) as address from `tabAddress` where customer='{}'".format(si.customer), as_list=1)
 	customer_address_line = [x[0] for x in address_list]
 	index = frappe.db.sql("select count(*) as count from `tabAddress` where customer = '{0}'".format(si.customer),as_dict=1)
-	# type_of_address ="Billing"
+
 	if qb_orders.get('BillAddr'):
 		address = []
 		bill_adress = qb_orders.get('BillAddr')
@@ -151,12 +120,10 @@ def new_address_creation(qb_orders, si):
 			return full_address, int(index[0]['count'])+1
 		else:
 			return full_address, False
-			# return create_address(full_address, si, bill_adress, type_of_address, int(index[0]['count'])+1)
 
 def get_address_name(full_address):
 	return frappe.db.get_value("Address", {"address_line1":full_address[:len(full_address)/2], 
 		"address_line2":full_address[len(full_address)/2:]}, "name")
-
 
 def create_address(full_address, si, bill_adress, type_of_address, index):
 	address_title, address_type = get_address_title_and_type(si.customer, type_of_address, index)
@@ -186,8 +153,6 @@ def get_address_title_and_type(customer_name, type_of_address, index):
 		address_title = "{0}-{1}".format(customer_name.strip(), index)
 	return address_title, address_type 
 
-
-
 def get_individual_item_tax(qb_orders, order_items, quickbooks_settings):
 	"""tax break for individual item from QuickBooks"""
 	taxes = []
@@ -216,17 +181,7 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings):
 		shipping_charges = get_order_shipping_detail(order_items, quickbooks_settings) 
 		if shipping_charges:
 			taxes.extend(shipping_charges)
-	# for i in get_order_items(order_items, quickbooks_settings):
-	# 	if i['quickbooks__tax_code_value']:
-	# 		tax_amount = flt(tax_amount) + (flt(i['quickbooks__tax_code_value']) * (i['qty'] *i['rate']))/100
-	# if tax_amount:
-	# 	taxes.append({
-	# 			"charge_type": _("On Net Total"),
-	# 			"account_head": get_tax_account_head(),
-	# 			"description": _("Total Tax added from invoice"),
-	# 			"rate": 0,
-	# 			"tax_amount": tax_amount
-	# 			})
+
 	return taxes
 
 def get_order_items(order_items, quickbooks_settings):
@@ -303,6 +258,39 @@ def get_item_code(qb_item):
 	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, "item_code")
 	return item_code
 
+# def get_individual_item_tax(order_items, quickbooks_settings):
+# 	"""tax break for individual item from QuickBooks"""
+# 	taxes = []
+# 	Default_company = frappe.defaults.get_defaults().get("company")
+# 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
+# 	tax_amount = 0
+# 	for i in get_order_items(order_items, quickbooks_settings):
+# 		if i['quickbooks__tax_code_value']:
+# 			tax_amount = flt(tax_amount) + (flt(i['quickbooks__tax_code_value']) * (i['qty'] *i['rate']))/100
+# 	if tax_amount:
+# 		taxes.append({
+# 				"charge_type": _("On Net Total"),
+# 				"account_head": get_tax_account_head(),
+# 				"description": _("Total Tax added from invoice"),
+# 				"rate": 0,
+# 				"tax_amount": tax_amount
+# 				})
+# 	return taxes
+# def new_address_creation(qb_orders, si):
+# 	address_list = frappe.db.sql("select concat(address_line1,address_line2) as address from `tabAddress` where customer='{}'".format(si.customer), as_list=1)
+# 	customer_address_line_1_2 = [x[0] for x in address_list]
+# 	index =frappe.db.sql("select count(*) as count from `tabAddress` where customer = '{0}'".format(si.customer),as_dict=1)
+# 	type_of_address ="Billing"
+# 	if qb_orders.get('BillAddr'):
+# 		address1 = []
+# 		full_address =''
+# 		bill_adress = qb_orders.get('BillAddr')
+# 		for j in range(len(bill_adress)-1):
+# 			if 'Line'+str(j+1) != 'Line1':
+# 				address1.append(bill_adress['Line'+str(j+1)])
+# 		full_address = " ".join(address1)
+# 		if not full_address in customer_address_line_1_2:
+# 			return create_address(full_address, si, bill_adress, type_of_address, int(index[0]['count'])+1)
 
 # def get_order_taxes(qb_orders):
 # 	taxes = []

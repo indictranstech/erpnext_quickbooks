@@ -6,10 +6,10 @@ import requests.exceptions
 from .utils import make_quickbooks_log, pagination
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_payment_entry_against_invoice
 
-"""Important code to fetch payment done againt invoice and create journal Entry""" 
+""" Create Payment entry against Sales Invoices"""
 
 def sync_si_payment(quickbooks_obj):
-	"""Fetch payment_invoice data from QuickBooks"""
+	"""Get all Payment(Payment Entry) from QuickBooks for all the Received Payment"""
 	business_objects = "Payment"
 	get_qb_payment = pagination(quickbooks_obj, business_objects)
 	if get_qb_payment: 
@@ -30,87 +30,74 @@ def validate_si_payment(get_qb_payment):
 					'TxnDate': entries.get('TxnDate'),
 					'qb_account_id': entries.get('DepositToAccountRef').get('value'),
 					'qb_si_id':line.get('LinkedTxn')[0].get('TxnId'),
-					'paid_amount': line.get('Amount')
+					'paid_amount': line.get('Amount'),
+					"doc_no": entries.get("DocNumber")
 					})
 	return recived_payment
+
 
 def sync_qb_journal_entry_against_si(get_payment_received):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	for recived_payment in get_payment_received:
  		try:
- 			if not frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": recived_payment.get('Id')}, "name"):
- 				create_journal_entry_against_si(recived_payment, quickbooks_settings)
+ 			if not frappe.db.get_value("Payment Entry", {"quickbooks_payment_id": recived_payment.get('Id')}, "name"):
+ 				create_payment_entry_si(recived_payment, quickbooks_settings)
  		except Exception, e:
  			make_quickbooks_log(title=e.message, status="Error", method="sync_qb_journal_entry_against_si", message=frappe.get_traceback(),
 						request_data=recived_payment, exception=True)
 
 
-def create_journal_entry_against_si(recived_payment, quickbooks_settings):
+def create_payment_entry_si(recived_payment, quickbooks_settings):
+	""" create payment entry against sales Invoice """
 	invoice_name =frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": recived_payment.get('qb_si_id')}, "name")
+	account_ref = get_account_detail(recived_payment.get('qb_account_id'))
 	if invoice_name:
 		ref_doc = frappe.get_doc("Sales Invoice", invoice_name)
-		si_je = frappe.get_doc({
-			"doctype": "Journal Entry",
-			"naming_series" : "SI-JV-Quickbooks-",
-			"quickbooks_journal_entry_id" : recived_payment.get('Id'),
-			"voucher_type" : _("Journal Entry"),
-			"posting_date" : recived_payment.get('TxnDate'),
-			"multi_currency": 1
-		})
-		get_journal_entry_account(si_je, "Sales Invoice", recived_payment, ref_doc, quickbooks_settings)
-		# print si_je, "---------------"
-		# data = si_je.accounts
-		# for i in data:
-		# 	print i.__dict__
-		# print "\n\n"		
-		# print "\n"
-		si_je.save()
-		si_je.submit()
+		si_pe = frappe.new_doc("Payment Entry")
+		si_pe.naming_series = "SI-PE-QB-"
+		si_pe.quickbooks_invoice_reference_no = ref_doc.get('quickbooks_invoice_no')
+		si_pe.quickbooks_payment_reference_no = recived_payment.get('doc_no')
+		si_pe.posting_date = recived_payment.get('TxnDate')
+		si_pe.quickbooks_payment_id = recived_payment.get('Id')
+		si_pe.payment_type = "Receive"
+		si_pe.party_type = "Customer"
+		si_pe.party = ref_doc.customer_name
+		si_pe.paid_from = ref_doc.get("debit_to")
+		# si_pe.paid_to = account_ref.get('name')
+		si_pe.paid_amount= flt(recived_payment.get('paid_amount'), si_pe.precision('paid_amount'))
+		si_pe.source_exchange_rate = recived_payment.get('ExchangeRate')
+		si_pe.base_paid_amount = flt(recived_payment.get('paid_amount') * recived_payment.get('ExchangeRate'), si_pe.precision('base_paid_amount'))
+		si_pe.base_received_amount = flt(recived_payment.get('paid_amount') * recived_payment.get('ExchangeRate'), si_pe.precision('base_received_amount'))
+		si_pe.allocate_payment_amount = 1
+		si_pe.reference_no = recived_payment.get('Type')
+		si_pe.reference_date = recived_payment.get('TxnDate')
+
+		get_accounts(si_pe, ref_doc, recived_payment, quickbooks_settings)
+		get_reference(dt= "Sales Invoice", pay_entry_obj= si_pe, ref_doc= ref_doc, ref_pay= recived_payment, quickbooks_settings= quickbooks_settings)
+		get_deduction(dt= "Sales Invoice", pay_entry_obj= si_pe, ref_doc= ref_doc, ref_pay= recived_payment, quickbooks_settings= quickbooks_settings)
+		
+		si_pe.flags.ignore_mandatory = True
+		si_pe.save(ignore_permissions=True)
+		si_pe.submit()
 		frappe.db.commit()
 
-def get_journal_entry_account(si_je, doctype , recived_payment, ref_doc, quickbooks_settings):
-	accounts_entry(si_je, doctype, recived_payment, ref_doc, quickbooks_settings)
-
-
-def accounts_entry(si_je, doctype, recived_payment, ref_doc, quickbooks_settings):
-	append_row_credit_detail(si_je= si_je, doctype= doctype, recived_payment= recived_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
-	append_row_debit_detail(si_je= si_je, recived_payment = recived_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
-
-def append_row_credit_detail(si_je= None, doctype= None, recived_payment = None, ref_doc=None, quickbooks_settings= None):
-	# print recived_payment.get('ExchangeRate'), "00000000000000000000000000000000000000000000000000000000000000000000000000000"
-	account = si_je.append("accounts", {})
-	account.account = ref_doc.debit_to
-	account.party_type =  "Customer"
-	account.party = ref_doc.customer_name
-	account.is_advance = "No"
-	account.exchange_rate = recived_payment.get('ExchangeRate')
-	account.credit = flt(recived_payment.get("Amount") , account.precision("credit"))
-	account.credit_in_account_currency = flt(recived_payment.get("paid_amount") , account.precision("credit_in_account_currency"))
-	account.reference_type = doctype
-	account.reference_name = ref_doc.name
-
-
-def append_row_debit_detail(si_je= None, recived_payment = None, ref_doc=None, quickbooks_settings= None):
+def get_accounts(si_pe, ref_doc, recived_payment, quickbooks_settings):
 	company_name = quickbooks_settings.select_company
 	company_currency = frappe.db.get_value("Company", {"name": company_name}, "default_currency")
-
-	account = si_je.append("accounts", {})
 	account_ref = get_account_detail(recived_payment.get('qb_account_id'))
-	account.account = account_ref.get('name')
+	si_pe.paid_to = account_ref.get('name')
 	if account_ref.get('account_currency') == company_currency:
-		account.exchange_rate = 1
-		account.debit_in_account_currency = flt(recived_payment.get("paid_amount") * recived_payment.get('ExchangeRate') , account.precision("debit_in_account_currency"))
+		si_pe.target_exchange_rate = 1
+		si_pe.received_amount = flt(recived_payment.get('paid_amount') * recived_payment.get('ExchangeRate'), si_pe.precision('received_amount'))
 	else:
-		account.exchange_rate = recived_payment.get('ExchangeRate')
-		account.debit_in_account_currency = flt(recived_payment.get("paid_amount") , account.precision("debit_in_account_currency"))
-
-	account.is_advance = "No"
+		si_pe.target_exchange_rate = recived_payment.get('ExchangeRate')
+		si_pe.received_amount = flt(recived_payment.get('paid_amount') , si_pe.precision('received_amount'))
 
 
-"""Important code to fetch payment done againt purchase invoice and create journal Entry against that PI""" 
+""" Create Payment entry against Purchase Invoices""" 
 
 def sync_pi_payment(quickbooks_obj):
-	"""Fetch BillPayment data from QuickBooks"""
+	"""Get all BillPayment(Payment Entry) from QuickBooks for all the paid Bills"""
 	business_objects = "BillPayment"
 	get_qb_billpayment = pagination(quickbooks_obj, business_objects)
 	if get_qb_billpayment:  
@@ -133,7 +120,8 @@ def validate_pi_payment(get_qb_billpayment):
 					"PayType" :entries.get('PayType'),
 					"qb_account_id": entries.get('CheckPayment').get('BankAccountRef').get('value'),
 					"qb_pi_id": linked_txn.get('LinkedTxn')[0].get('TxnId'),
-					'paid_amount': linked_txn.get('Amount')
+					'paid_amount': linked_txn.get('Amount'),
+					"doc_no": entries.get("DocNumber")
 					})
 	return paid_pi
 
@@ -141,69 +129,89 @@ def sync_qb_journal_entry_against_pi(get_bill_pi):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	for bill_payment in get_bill_pi:
 		try:
-			if not frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": bill_payment.get('Id')}, "name"):
-				create_journal_entry_against_pi(bill_payment, quickbooks_settings)
+			if not frappe.db.get_value("Payment Entry", {"quickbooks_payment_id": bill_payment.get('Id')}, "name"):
+				create_payment_entry_pi(bill_payment, quickbooks_settings)
 		except Exception, e:
 			make_quickbooks_log(title=e.message, status="Error", method="sync_qb_journal_entry_against_pi", message=frappe.get_traceback(),
 						request_data=bill_payment, exception=True)
 
 
-def create_journal_entry_against_pi(bill_payment, quickbooks_settings):
+
+def create_payment_entry_pi(bill_payment, quickbooks_settings):
+	""" create payment entry against Purchase Invoice """
+
 	invoice_name =frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": bill_payment.get('qb_pi_id')}, "name")
+	account_ref = get_account_detail(bill_payment.get('qb_account_id'))
 	if invoice_name:
 		ref_doc = frappe.get_doc("Purchase Invoice", invoice_name)
-		pi_je = frappe.get_doc({
-			"doctype": "Journal Entry",
-			"naming_series" : "PI-JV-Quickbooks-",
-			"quickbooks_journal_entry_id" : bill_payment.get('Id'),
-			"voucher_type" : _("Journal Entry"),
-			"posting_date" : bill_payment.get('TxnDate'),
-			"multi_currency": 1
-		})
-		get_journal_entry_account_pi(pi_je, "Purchase Invoice", bill_payment, ref_doc, quickbooks_settings)
-		pi_je.save()
-		pi_je.submit()
+		pi_pe = frappe.new_doc("Payment Entry")
+		pi_pe.naming_series = "PI-PE-QB-"
+		pi_pe.quickbooks_invoice_reference_no = ref_doc.get('quickbooks_bill_no')
+		pi_pe.quickbooks_payment_reference_no = bill_payment.get('doc_no')
+		pi_pe.posting_date = bill_payment.get('TxnDate')
+		pi_pe.quickbooks_payment_id = bill_payment.get('Id')
+		pi_pe.payment_type = "Pay"
+		pi_pe.party_type = "Supplier"
+		pi_pe.party = ref_doc.supplier_name
+		pi_pe.paid_to = ref_doc.get("credit_to")
+		pi_pe.received_amount = flt(bill_payment.get('paid_amount'), pi_pe.precision('received_amount'))
+		pi_pe.target_exchange_rate = bill_payment.get('ExchangeRate')
+		pi_pe.base_received_amount =  flt(bill_payment.get('paid_amount') * bill_payment.get('ExchangeRate'), pi_pe.precision('base_received_amount'))
+		pi_pe.base_paid_amount = flt(bill_payment.get('paid_amount') * bill_payment.get('ExchangeRate'), pi_pe.precision('base_paid_amount'))
+		pi_pe.allocate_payment_amount = 1
+		pi_pe.reference_no = bill_payment.get('Type')
+		pi_pe.reference_date = bill_payment.get('TxnDate')
+
+		get_accounts_pi(pi_pe, ref_doc, bill_payment, quickbooks_settings)
+		get_reference(dt= "Purchase Invoice", pay_entry_obj= pi_pe, ref_doc= ref_doc, ref_pay= bill_payment, quickbooks_settings= quickbooks_settings)
+		get_deduction(dt= "Purchase Invoice", pay_entry_obj= pi_pe, ref_doc= ref_doc, ref_pay= bill_payment, quickbooks_settings= quickbooks_settings)
+		pi_pe.flags.ignore_mandatory = True
+		pi_pe.save(ignore_permissions=True)
+		pi_pe.submit()
 		frappe.db.commit()
 
+def get_accounts_pi(pi_pe, ref_doc, bill_payment, quickbooks_settings):
+	""" set exchange rate and payment amount , when payment is done in multi currency, apart from system currency """
 
-
-
-def get_journal_entry_account_pi(pi_je, doctype , bill_payment, ref_doc, quickbooks_settings):
-	accounts_entry_pi(pi_je, doctype, bill_payment, ref_doc, quickbooks_settings)
-
-
-def accounts_entry_pi(pi_je, doctype, bill_payment, ref_doc, quickbooks_settings):
-	append_row_debit_detail_pi(pi_je= pi_je, doctype= doctype, bill_payment= bill_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
-	append_row_credit_detail_pi(pi_je= pi_je, bill_payment = bill_payment, ref_doc=ref_doc, quickbooks_settings= quickbooks_settings)
-
-def append_row_debit_detail_pi(pi_je= None, doctype= None, bill_payment = None, ref_doc=None, quickbooks_settings= None):
-	account = pi_je.append("accounts", {})
-	account.account = ref_doc.credit_to
-	account.party_type =  "Supplier"
-	account.party = ref_doc.supplier_name
-	account.is_advance = "No"
-	account.exchange_rate = bill_payment.get('ExchangeRate')
-	account.debit = flt(bill_payment.get("Amount") , account.precision("debit"))
-	account.debit_in_account_currency = flt(bill_payment.get("paid_amount") , account.precision("debit_in_account_currency"))
-	account.reference_type = doctype
-	account.reference_name = ref_doc.name
-
-def get_account_detail(quickbooks_account_id):
-	return frappe.db.get_value("Account", {"quickbooks_account_id": quickbooks_account_id}, ["name", "account_currency"], as_dict=1)
-
-def append_row_credit_detail_pi(pi_je= None, bill_payment = None, ref_doc=None, quickbooks_settings= None):
 	company_name = quickbooks_settings.select_company
 	company_currency = frappe.db.get_value("Company", {"name": company_name}, "default_currency")
-
-	account = pi_je.append("accounts", {})
 	account_ref = get_account_detail(bill_payment.get('qb_account_id'))
+	pi_pe.paid_from = account_ref.get('name')
 	if account_ref.get('account_currency') == company_currency:
-		account.exchange_rate = 1
-		account.credit_in_account_currency = flt(bill_payment.get("paid_amount") * bill_payment.get('ExchangeRate'), account.precision("credit_in_account_currency"))
+		pi_pe.source_exchange_rate = 1
+		pi_pe.paid_amount = flt(bill_payment.get('paid_amount') * bill_payment.get('ExchangeRate'), pi_pe.precision('paid_amount'))
 	else:
-		account.exchange_rate = bill_payment.get('ExchangeRate')
-		account.credit_in_account_currency = flt(bill_payment.get("paid_amount") , account.precision("credit_in_account_currency"))
+		pi_pe.source_exchange_rate = bill_payment.get('ExchangeRate')
+		pi_pe.paid_amount = flt(bill_payment.get('paid_amount') , pi_pe.precision('paid_amount'))
 
-	account.account = account_ref.get('name')
-	account.is_advance = "No"
-	
+
+
+def get_reference(dt= None, pay_entry_obj= None, ref_doc= None, ref_pay= None, quickbooks_settings= None):
+	""" get reference of Invoices for which payment is done. """
+
+	account = pay_entry_obj.append("references", {})
+	account.reference_doctype = dt
+	account.reference_name = ref_doc.get('name')
+	account.total_amount = flt(ref_doc.get('grand_total'), account.precision('total_amount'))
+	account.allocated_amount = flt(ref_pay.get('paid_amount'), account.precision('allocated_amount'))
+
+
+def get_deduction(dt= None, pay_entry_obj= None, ref_doc= None, ref_pay= None, quickbooks_settings= None):
+	"""	calculate deduction for Multi currency gain and loss """
+	if dt == "Purchase Invoice":
+		total_allocated_amount = flt(ref_pay.get("paid_amount") * ref_doc.get('conversion_rate'))
+		recevied_amount = flt(ref_pay.get("paid_amount") * ref_pay.get('ExchangeRate'))
+		deduction_amount = recevied_amount - total_allocated_amount
+	else:
+		total_allocated_amount = flt(flt(ref_pay.get("paid_amount")) * flt(ref_doc.get('conversion_rate')))
+		deduction_amount = total_allocated_amount - pay_entry_obj.base_received_amount
+
+	if round(deduction_amount, 2):
+		deduction = pay_entry_obj.append("deductions",{})
+		deduction.account = quickbooks_settings.profit_loss_account
+		deduction.cost_center = frappe.db.get_value("Company",{"name": quickbooks_settings.select_company },"cost_center")
+		deduction.amount = deduction_amount
+
+def get_account_detail(quickbooks_account_id):
+	""" account for payment """
+	return frappe.db.get_value("Account", {"quickbooks_account_id": quickbooks_account_id}, ["name", "account_currency"], as_dict=1)
