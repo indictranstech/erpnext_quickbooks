@@ -122,14 +122,15 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	sync_items(quickbooks_obj)
 	
 	sync_pi_orders(quickbooks_obj)
-	sync_pi_payment(quickbooks_obj)
-	sync_supplier_credits(quickbooks_obj)
-	
 	sync_si_orders(quickbooks_obj)
-	sync_si_payment(quickbooks_obj)
+	
 	sync_credit_notes(quickbooks_obj)
-	sync_expenses(quickbooks_obj)
+	sync_supplier_credits(quickbooks_obj)
 
+	sync_pi_payment(quickbooks_obj)
+	sync_si_payment(quickbooks_obj)
+
+	sync_expenses(quickbooks_obj)
 	sync_entry(quickbooks_obj)
 
 def validate_quickbooks_settings(quickbooks_settings):

@@ -13,12 +13,15 @@ def sync_si_payment(quickbooks_obj):
 	business_objects = "Payment"
 	get_qb_payment = pagination(quickbooks_obj, business_objects)
 	if get_qb_payment: 
+		# print get_qb_payment, "---------------------------"
 		get_payment_received= validate_si_payment(get_qb_payment)
 		if get_payment_received:
 			sync_qb_journal_entry_against_si(get_payment_received)
 
 def validate_si_payment(get_qb_payment):
 	recived_payment = [] 
+	payment_against_credit_note = []
+	payments = []
 	for entries in get_qb_payment:
 		if entries.get('DepositToAccountRef'):
 			for line in entries['Line']:
@@ -33,8 +36,95 @@ def validate_si_payment(get_qb_payment):
 					'paid_amount': line.get('Amount'),
 					"doc_no": entries.get("DocNumber")
 					})
+		else:
+			payment_against_credit_note.append(entries);
+			
+	if payment_against_credit_note:
+		pass 
+		# adjust_entries(payment_against_credit_note)
 	return recived_payment
 
+def adjust_entries(payment_against_credit_note):
+	for entries in payment_against_credit_note:
+		payments = []
+		for line in entries['Line']:
+			payments.append({
+				'Id': entries.get('Id')+"-"+'SI'+"-"+line.get('LinkedTxn')[0].get('TxnId'),
+				'Type':	line.get('LinkedTxn')[0].get('TxnType'),
+				'ExchangeRate': entries.get('ExchangeRate'),
+				'Amount': line.get('Amount')*entries.get('ExchangeRate'),
+				'TxnDate': entries.get('TxnDate'),
+				'qb_si_id': line.get('LinkedTxn')[0].get('TxnId') if line.get('LinkedTxn')[0].get('TxnType') == "Invoice" else None,
+				'paid_amount': line.get('Amount'),
+				"doc_no": entries.get("DocNumber"),
+				"credit_not_id" : line.get('LinkedTxn')[0].get('TxnId')+"CE" if line.get('LinkedTxn')[0].get('TxnType') == "CreditMemo" else None,
+				"customer_name" : frappe.db.get_value("Customer",{"quickbooks_cust_id":entries['CustomerRef'].get('value')},"name")
+				})
+		adjust_journal_entries_against_credit_note(payments)
+			# print entries.get('Id'), "data", line 
+
+def adjust_journal_entries_against_credit_note(payments):
+	print "\n\n"
+	for row in payments:
+		if row.get('credit_not_id'):
+			print row.get('credit_not_id'), "datatdatatdtatdtatd"
+			entry_name = frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": row.get('credit_not_id')}, "name")
+			journal_entry = frappe.get_doc("Journal Entry", entry_name)
+			account_entry(journal_entry, payments, row)
+			# print data.__dict__, "ppppppppppppppp"
+		# print payments, "hello"
+def account_entry(journal_entry, payments, credit_memo):
+	account = []
+	credit_entry = {}
+	advance_entry = {}
+	total_amount =  0
+	debit_to = ""
+	for row in journal_entry.accounts:
+		if row.get('debit_in_account_currency'):
+			total_amount = flt(row.get('debit_in_account_currency'))
+			account.append(row)
+			journal_entry.append("accounts", row)
+	for invoice in payments:
+		if invoice.get("Type") == "Invoice":
+			invoice_name = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": invoice.get('qb_si_id') }, "name")
+			
+			invoice = frappe.get_doc("Sales Invoice", invoice_name)
+			account = journal_entry.append("accounts", {})
+			account.credit_in_account_currency = flt(invoice.get('paid_amount'))
+			account.party_type = "Customer"
+			account.party = invoice.get('customer_name')
+			account.account = invoice.get('debit_to')
+			account.reference_type = "Sales Invoice"
+			account.reference_name = invoice_name
+			account.is_advance = "Yes"
+			debit_to = invoice.get('debit_to')
+		
+			# credit_entry['credit_in_account_currency'] = flt(invoice.get('paid_amount'))
+			# credit_entry['party_type'] = "Customer"
+			# credit_entry['party'] = invoice.get('customer_name')
+			# credit_entry['account'] = invoice.get('debit_to')
+			# credit_entry['reference_type'] = "Sales Invoice"
+			# credit_entry['reference_name'] = invoice_name
+			# credit_entry['is_advance'] = "Yes"
+			# account.append(credit_entry)
+		else:
+			account = journal_entry.append("accounts", {})
+			account.credit_in_account_currency = flt(total_amount) - flt(credit_memo.get('paid_amount'))
+			account.account = debit_to
+			account.is_advance = "Yes"
+			# advance_entry['credit_in_account_currency'] = flt(total_amount) - flt(credit_memo.get('paid_amount'))
+			# advance_entry['account'] =  debit_to
+			# advance_entry['is_advance'] = "Yes"
+	account.append(advance_entry)
+	
+	# journal_entry.update("accounts":account)
+	print account, "-------------------"				
+
+	# for row in journal_entry.accounts:
+	# 	if row.get('debit_in_account_currency'):
+	# 		account.extend(row)
+	# journal_entry.update({"account" : account})
+		
 
 def sync_qb_journal_entry_against_si(get_payment_received):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
