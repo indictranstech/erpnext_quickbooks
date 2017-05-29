@@ -52,35 +52,6 @@ def create_Supplier(qb_supplier, quickbooks_supplier_list):
 				request_data=qb_supplier, exception=True)
 	return quickbooks_supplier_list
 
-# def create_Supplier(qb_supplier, quickbooks_settings, quickbooks_supplier_list):
-# 	""" Store Supplier Data in ERPNEXT """ 
-# 	supplier = None
-# 	try:	
-# 		supplier = frappe.get_doc({
-# 			"doctype": "Supplier",
-# 			"quickbooks_supp_id": str(qb_supplier.get('Id')) if qb_supplier.get('Id')  else str(qb_supplier.get('value')),
-# 			"supplier_name" : str(qb_supplier.get('DisplayName')) if qb_supplier.get('DisplayName')  else str(qb_supplier.get('name')),
-# 			"supplier_type" :  _("Distributor"),
-# 			"default_currency" : qb_supplier['CurrencyRef'].get('value','') if qb_supplier.get('CurrencyRef') else ''
-# 		})
-# 		# "accounts": get_party_account(qb_supplier, quickbooks_settings)
-# 		supplier.flags.ignore_mandatory = True
-# 		supplier.insert()
-
-# 		if supplier and qb_supplier.get('BillAddr'):
-# 			create_supplier_address(qb_supplier, supplier, qb_supplier.get("BillAddr"), "Billing", 1)
-		
-# 		frappe.db.commit()
-# 		quickbooks_supplier_list.append(supplier.quickbooks_supp_id)
-
-# 	except Exception, e:
-# 		if e.args[0] and e.args[0].startswith("402"):
-# 			raise e
-# 		else:
-# 			make_quickbooks_log(title=e.message, status="Error", method="create_Supplier", message=frappe.get_traceback(),
-# 				request_data=qb_supplier, exception=True)
-# 	return quickbooks_supplier_list
-
 def get_party_account(qb_supplier):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	party_account = []

@@ -8,7 +8,6 @@ from .utils import make_quickbooks_log, pagination
 from pyqb.quickbooks.batch import batch_create
 from pyqb.quickbooks.objects.item import Item
 
-
 def sync_items(quickbooks_obj):
 	"""Fetch Items data from QuickBooks"""
 	quickbooks_item_list = []

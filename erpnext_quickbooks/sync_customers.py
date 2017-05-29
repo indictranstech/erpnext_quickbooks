@@ -15,12 +15,9 @@ def sync_customers(quickbooks_obj):
 		sync_qb_customers(get_qb_customer,quickbooks_customer_list)
 	
 def sync_qb_customers(get_qb_customer, quickbooks_customer_list):
-	# quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	for qb_customer in get_qb_customer:
-		# if not frappe.db.get_value("Customer", {"quickbooks_cust_id": [qb_customer.get('Id'), qb_customer.get('value')]}, "name"):
 		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": qb_customer.get('Id')}, "name"):
 			create_customer(qb_customer, quickbooks_customer_list)
-
 
 def create_customer(qb_customer, quickbooks_customer_list):
 	""" store Customer data in ERPNEXT """ 
@@ -55,40 +52,6 @@ def create_customer(qb_customer, quickbooks_customer_list):
 				request_data=qb_customer, exception=True)
 	
 	return quickbooks_customer_list
-
-# def create_customer(qb_customer, quickbooks_settings, quickbooks_customer_list):
-# 	""" store Customer data in ERPNEXT """ 
-# 	customer = None
-# 	try:	
-# 		customer = frappe.get_doc({
-# 			"doctype": "Customer",
-# 			"quickbooks_cust_id": str(qb_customer.get('Id')) if qb_customer.get('Id')  else str(qb_customer.get('value')),
-# 			"customer_name" : str(qb_customer.get('DisplayName')) if qb_customer.get('DisplayName')  else str(qb_customer.get('name')),
-# 			"customer_type" : _("Individual"),
-# 			"customer_group" : _("Commercial"),
-# 			"default_currency" : qb_customer['CurrencyRef'].get('value','') if qb_customer.get('CurrencyRef') else '',
-# 			"territory" : _("All Territories")
-# 		})
-# 		# "accounts" : get_party_account(qb_customer, quickbooks_settings)
-# 		customer.flags.ignore_mandatory = True
-# 		customer.insert()
-		
-# 		if customer and qb_customer.get('BillAddr'):
-# 			create_customer_address(qb_customer, customer, qb_customer.get("BillAddr"), "Billing", 1)
-# 		if customer and qb_customer.get('ShipAddr'):
-# 			create_customer_address(qb_customer, customer, qb_customer.get("ShipAddr"), "Shipping", 2)
-
-# 		frappe.db.commit()
-# 		quickbooks_customer_list.append(customer.quickbooks_cust_id)
-
-# 	except Exception, e:
-# 		if e.args[0] and e.args[0].startswith("402"):
-# 			raise e
-# 		else:
-# 			make_quickbooks_log(title=e.message, status="Error", method="create_customer", message=frappe.get_traceback(),
-# 				request_data=qb_customer, exception=True)
-	
-# 	return quickbooks_customer_list
 
 def get_party_account(qb_customer):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")

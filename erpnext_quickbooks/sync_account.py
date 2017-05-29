@@ -81,38 +81,9 @@ def quickbooks_accounts_head(quickbooks_settings):
 					'Expense, Expenses':['Other Expenses','Cost of Goods Solds']}
 	return category_type
 
-def delete_chart_of_accounts(quickbooks_settings, Company_abbr):
-	# quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
-	# Company_abbr = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "abbr")
-	frappe.db.sql("""Delete from `tabAccount` 
-		where is_group =0 
-		and company = '{0}'
-		and name not in('Creditors - {1}', 'Cash - {1}', 'Cost of Goods Sold - {1}', 'Debtors - {1}', 
-			'Sales - {1}', 'Rounded Off - {1}', 'Main - {1}', 'Main - {1}', 'Stock Received But Not Billed - {1}', 
-			'Expenses Included In Valuation - {1}', 'Stock Adjustment - {1}', 'Accumulated Depreciation - {1}', 
-			'Depreciation - {1}','Main - {1}','Finished Goods - {1}','Stores - {1}','Work In Progress - {1}', 
-			'Marketing Expenses - {1}', 'Round Off - {1}', 'Cash in Transit - {1}', 'Paypal Account - {1}')
-		""" .format(quickbooks_settings.select_company, Company_abbr))
-	frappe.db.sql("""Delete from `tabAccount` 
-		where is_group =1 
-		and company = '{0}'
-		and name in('Indirect Income - {1}', 'Tax Assets - {1}','Securities and Deposits - {1}', 'Fixed Assets - {1}',
-		 'Loans (Liabilities) - {1}', 'Duties and Taxes - {1}', 'Indirect Income - {1}', 'Bank Accounts - {1}', 
-		 'Loans and Advances (Assets) - {1}', 'Investments - {1}', 'Temporary Accounts - {1}', 'Salaries - {1}',
-		 'Bonuses - {1}', 'Expenses-Staff - {1}', 'Tax Expenses - {1}', 'Depreciation - {1}', 'Expenses-Other - {1}',
-		 'Utilities - {1}', 'Subscription Fees - {1}', 'Repairs and Maintenance - {1}', 'Rental Costs - {1}',
-		 'Communication Costs - {1}', 'Commission Charges - {1}', 'Expenses-Operating - {1}', 'Expenses-Marketing - {1}',
-		 'Expenses-Administrative - {1}' , 'Interest Income - {1}', 'Non-current liabilities - {1}',
-		 'Provision and Accruals - {1}', 'Loans-Current - {1}', 'Duties and Taxes - {1}', 'Capital Account - {1}', 'Temporary Accunts - {1}',
-		 "Shares - {1}", 'Investments - {1}', 'Securities and Deposits - {1}', 'Loans and Advances-Assets - {1}'
-		 )
-		""" .format(quickbooks_settings.select_company, Company_abbr))
-
-	
 def creates_qb_accounts_heads_to_erp_chart_of_accounts():
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	Company_abbr = frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "abbr")
-	# delete_chart_of_accounts(quickbooks_settings, Company_abbr)
 	for root_type, account_names  in quickbooks_accounts_head(quickbooks_settings).items():
 		for account_name in account_names:
 			if not frappe.db.get_value("Account", {"quickbooks_account_id": "Quickbooks_catagory", "name": account_name + " - qb - " + Company_abbr}, "name"):
@@ -133,7 +104,6 @@ def creates_qb_accounts_heads_to_erp_chart_of_accounts():
 					else:
 						make_quickbooks_log(title=e.message, status="Error", method="creates_qb_accounts_heads_to_erp_chart_of_accounts", message=frappe.get_traceback(),
 							request_data=account_names, exception=True)
-
 
 def account_mapper_all_country(qb_account, Company_abbr):
 	if qb_account.get('AccountType') == "Fixed Asset":
@@ -182,11 +152,6 @@ def account_mapper_all_country(qb_account, Company_abbr):
 		parent_account = _("Cost of Goods Solds") + " - " + 'qb' + " - " +  Company_abbr
 		root_type = _("Expense")
 	return parent_account, root_type 
-
-
-
-
-
 
 def account_mapper_for_all_country(qb_account, Company_abbr):
 	if qb_account.get('AccountType') == "Fixed Asset":

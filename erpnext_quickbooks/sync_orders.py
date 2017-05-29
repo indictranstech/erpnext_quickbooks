@@ -232,12 +232,15 @@ def tax_code_ref(qb_item, quickbooks_settings):
 	individual_item_tax = ''
 	if qb_item.get('SalesItemLineDetail').get('TaxCodeRef'):
 		tax_code_id1 = qb_item.get('SalesItemLineDetail').get('TaxCodeRef').get('value') if qb_item.get('SalesItemLineDetail') else ''
-		individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
-						from 
-							`tabQuickBooks TaxRate` as qbr,
-							(select * from `tabQuickBooks SalesTaxRateList` where parent = {0}) as qbs 
-						where 
-							qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1),as_dict=1)
+		query = """
+				select 
+					qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
+				from
+					`tabQuickBooks TaxRate` as qbr,
+					(select * from `tabQuickBooks SalesTaxRateList` where parent = {0}) as qbs 
+				where
+					qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id1)
+		individual_item_tax =  frappe.db.sql(query, as_dict=1)
 		item_tax_rate = get_tax_head_mapped_to_particular_account(individual_item_tax[0]['tax_head'], quickbooks_settings)
 		item_wise_tax[cstr(item_tax_rate)] = flt(individual_item_tax[0]['tax_percent'])
 	return item_wise_tax, cstr(individual_item_tax[0]['tax_head']) if individual_item_tax else '', flt(individual_item_tax[0]['tax_percent']) if individual_item_tax else 0
@@ -256,69 +259,6 @@ def get_item_code(qb_item):
 	quickbooks_item_id = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else ''
 	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, "item_code")
 	return item_code
-
-# def get_individual_item_tax(order_items, quickbooks_settings):
-# 	"""tax break for individual item from QuickBooks"""
-# 	taxes = []
-# 	Default_company = frappe.defaults.get_defaults().get("company")
-# 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
-# 	tax_amount = 0
-# 	for i in get_order_items(order_items, quickbooks_settings):
-# 		if i['quickbooks__tax_code_value']:
-# 			tax_amount = flt(tax_amount) + (flt(i['quickbooks__tax_code_value']) * (i['qty'] *i['rate']))/100
-# 	if tax_amount:
-# 		taxes.append({
-# 				"charge_type": _("On Net Total"),
-# 				"account_head": get_tax_account_head(),
-# 				"description": _("Total Tax added from invoice"),
-# 				"rate": 0,
-# 				"tax_amount": tax_amount
-# 				})
-# 	return taxes
-# def new_address_creation(qb_orders, si):
-# 	address_list = frappe.db.sql("select concat(address_line1,address_line2) as address from `tabAddress` where customer='{}'".format(si.customer), as_list=1)
-# 	customer_address_line_1_2 = [x[0] for x in address_list]
-# 	index =frappe.db.sql("select count(*) as count from `tabAddress` where customer = '{0}'".format(si.customer),as_dict=1)
-# 	type_of_address ="Billing"
-# 	if qb_orders.get('BillAddr'):
-# 		address1 = []
-# 		full_address =''
-# 		bill_adress = qb_orders.get('BillAddr')
-# 		for j in range(len(bill_adress)-1):
-# 			if 'Line'+str(j+1) != 'Line1':
-# 				address1.append(bill_adress['Line'+str(j+1)])
-# 		full_address = " ".join(address1)
-# 		if not full_address in customer_address_line_1_2:
-# 			return create_address(full_address, si, bill_adress, type_of_address, int(index[0]['count'])+1)
-
-# def get_order_taxes(qb_orders):
-# 	taxes = []
-# 	Default_company = frappe.defaults.get_defaults().get("company")
-# 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
-
-# 	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
-# 		if qb_orders.get('GlobalTaxCalculation') == 'TaxExcluded' and qb_orders.get('TxnTaxDetail').get('TaxLine'):
-# 			taxes.append({
-# 				"charge_type": _("Actual"),
-# 				"account_head": get_tax_account_head(),
-# 				"description": _("Total Tax added from invoice"),
-# 				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
-# 			})
-# 	return taxes
-
-
-
-# def get_tax_account_head():
-# 	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \
-# 		{"parent": "Quickbooks Settings"}, "tax_account")
-
-# 	if not tax_account:
-# 		frappe.throw("Tax Account not specified for QuickBooks Tax ")
-
-# 	return tax_account
-
-
-
 
 from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.invoice import Invoice

@@ -85,14 +85,6 @@ def set_terms(pi, qb_orders):
 		pi.tc_name = term_nd_condition.get('name')
 		pi.terms = term_nd_condition.get('terms')
 
-# def set_credit_to(pi, qb_orders, quickbooks_settings, default_currency):
-# 	APAccountRef
-# 	party_currency = qb_orders.get("CurrencyRef").get('value') if qb_orders.get("CurrencyRef") else default_currency
-# 	if party_currency:
-# 		credtors_account = frappe.db.get_value("Account", {"account_currency": party_currency, 'account_type': 'Payable',\
-# 			"company": quickbooks_settings.select_company, "root_type": "Liability"}, "name")
-# 		pi.credit_to = credtors_account
-
 def set_credit_to(pi, qb_orders):
 	pi.credit_to = frappe.db.get_value("Account", {"quickbooks_account_id": qb_orders.get('APAccountRef').get('value')}, "name")
 
@@ -308,12 +300,15 @@ def item_based_expense_line_detail_tax_code_ref(qb_orders,qb_item, quickbooks_se
 		if qb_item.get('ItemBasedExpenseLineDetail').get('TaxCodeRef'):
 			tax_code_id = qb_item.get('ItemBasedExpenseLineDetail').get('TaxCodeRef').get('value') if qb_item.get('ItemBasedExpenseLineDetail') else ''
 			if not tax_code_id == 'NON':
-				individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
-								from 
-									`tabQuickBooks TaxRate` as qbr,
-									(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
-								where 
-									qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id),as_dict=1)
+				query = """
+						select 
+							qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
+						from
+							`tabQuickBooks TaxRate` as qbr,
+							(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
+						where
+							qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id)
+				individual_item_tax =  frappe.db.sql(query, as_dict=1)
 				tax_head = individual_item_tax[0]['tax_head']
 				tax_percent = flt(individual_item_tax[0]['tax_percent'])
 				item_tax_rate = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
@@ -339,11 +334,10 @@ def account_based_expense_line_detail(qb_orders, order_items, quickbooks_setting
 			})
 	return Expense
 
-
 def account_based_expense_line_detail_tax_code_ref(qb_orders, qb_item, quickbooks_settings):
 	"""
-	this function tell about Tax Account(in which tax will going to be get booked) and how much tax percent amount will going
-	to get booked in that particular account for each Entry
+	This function tell about Tax Account(in which tax will going to be get booked) and how 
+	much tax percent amount will going to get booked in that particular account for each Entry
 	"""
 	item_wise_tax ={}
 	tax_head = ''
@@ -352,12 +346,15 @@ def account_based_expense_line_detail_tax_code_ref(qb_orders, qb_item, quickbook
 		if qb_item.get('AccountBasedExpenseLineDetail').get('TaxCodeRef'):
 			tax_code_id = qb_item.get('AccountBasedExpenseLineDetail').get('TaxCodeRef').get('value') if qb_item.get('AccountBasedExpenseLineDetail') else ''
 			if not tax_code_id == 'NON':
-				individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
-								from 
-									`tabQuickBooks TaxRate` as qbr,
-									(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
-								where 
-									qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id),as_dict=1)
+				query = """
+						select 
+							qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent
+						from
+							`tabQuickBooks TaxRate` as qbr,
+							(select * from `tabQuickBooks PurchaseTaxRateList` where parent = {0}) as qbs 
+						where
+							qbr.tax_rate_id = qbs.tax_rate_id """.format(tax_code_id)
+				individual_item_tax =  frappe.db.sql(query, as_dict=1)
 				tax_head = individual_item_tax[0]['tax_head']
 				tax_percent = flt(individual_item_tax[0]['tax_percent'])
 				item_tax_rate = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
@@ -376,35 +373,6 @@ def get_item_code(qb_item):
 	quickbooks_item_id = qb_item.get('ItemBasedExpenseLineDetail').get('ItemRef').get('value') if qb_item.get('ItemBasedExpenseLineDetail') else ''
 	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, "item_code")
 	return item_code
-
-
-# def get_order_taxes(qb_orders):
-# 	taxes = []
-# 	Default_company = frappe.defaults.get_defaults().get("company")
-# 	Company_abbr = frappe.db.get_value("Company",{"name":Default_company},"abbr")
-	
-# 	if not qb_orders.get('GlobalTaxCalculation') == 'NotApplicable':
-# 		if qb_orders.get('GlobalTaxCalculation') == 'TaxExcluded' and qb_orders.get('TxnTaxDetail').get('TaxLine'):
-# 			taxes.append({
-# 				"category" : _("Total"),
-# 				"charge_type": _("Actual"),
-# 				"account_head": get_tax_account_head(),
-# 				"description": "Total Tax added from invoice",
-# 				"tax_amount": qb_orders.get('TxnTaxDetail').get('TotalTax') 
-# 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
-# 			})
-# 		# else:
-# 		# 	for tax in qb_orders['TxnTaxDetail']['TaxLine']:
-# 		# 			taxes.append({
-# 		# 				"charge_type": _("On Net Total"),
-# 		# 				"account_head": "Commission on Sales - ES",#get_tax_account_head(tax),
-# 		# 				"description": "{0} - {1}%".format(tax.get("title"), tax.get("rate") * 100.0),
-# 		# 				"rate": tax.get("rate") * 100.00
-# 		# 				#"included_in_print_rate": set_included_in_print_rate(shopify_order)
-# 		# 			})
-# 			#taxes = update_taxes_with_shipping_lines(taxes, shopify_order.get("shipping_lines"))
-# 	return taxes
-
 
 def get_tax_account_head():
 	tax_account =  frappe.db.get_value("Quickbooks Tax Account", \

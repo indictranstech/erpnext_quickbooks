@@ -38,9 +38,9 @@ def validate_si_payment(get_qb_payment):
 					})
 		else:
 			payment_against_credit_note.append(entries);
-			
+
 	if payment_against_credit_note:
-		pass 
+		pass
 		# adjust_entries(payment_against_credit_note)
 	return recived_payment
 
@@ -52,79 +52,63 @@ def adjust_entries(payment_against_credit_note):
 				'Id': entries.get('Id')+"-"+'SI'+"-"+line.get('LinkedTxn')[0].get('TxnId'),
 				'Type':	line.get('LinkedTxn')[0].get('TxnType'),
 				'ExchangeRate': entries.get('ExchangeRate'),
-				'Amount': line.get('Amount')*entries.get('ExchangeRate'),
+				'Amount': flt(line.get('Amount')*entries.get('ExchangeRate'),2),
 				'TxnDate': entries.get('TxnDate'),
 				'qb_si_id': line.get('LinkedTxn')[0].get('TxnId') if line.get('LinkedTxn')[0].get('TxnType') == "Invoice" else None,
-				'paid_amount': line.get('Amount'),
+				'paid_amount': flt(line.get('Amount')),
 				"doc_no": entries.get("DocNumber"),
 				"credit_not_id" : line.get('LinkedTxn')[0].get('TxnId')+"CE" if line.get('LinkedTxn')[0].get('TxnType') == "CreditMemo" else None,
-				"customer_name" : frappe.db.get_value("Customer",{"quickbooks_cust_id":entries['CustomerRef'].get('value')},"name")
+				"customer_name" : frappe.db.get_value("Customer",{"quickbooks_cust_id":entries['CustomerRef'].get('value')},"name"),
 				})
 		adjust_journal_entries_against_credit_note(payments)
-			# print entries.get('Id'), "data", line 
 
 def adjust_journal_entries_against_credit_note(payments):
 	print "\n\n"
 	for row in payments:
 		if row.get('credit_not_id'):
-			print row.get('credit_not_id'), "datatdatatdtatdtatd"
-			entry_name = frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": row.get('credit_not_id')}, "name")
-			journal_entry = frappe.get_doc("Journal Entry", entry_name)
-			account_entry(journal_entry, payments, row)
+			if row.get('credit_not_id') != "88CE":
+				print row.get('credit_not_id'), "datatdatatdtatdtatd"
+				entry_name = frappe.db.get_value("Journal Entry", {"quickbooks_journal_entry_id": row.get('credit_not_id')}, "name")
+				journal_entry = frappe.get_doc("Journal Entry", entry_name)
+				account_entry(journal_entry, payments, row)
+			else:
+				print row,"datatatdtatdttatdtadtatdtatdtadttadtatdtatdtatdtd	"
 			# print data.__dict__, "ppppppppppppppp"
 		# print payments, "hello"
-def account_entry(journal_entry, payments, credit_memo):
-	account = []
-	credit_entry = {}
-	advance_entry = {}
-	total_amount =  0
-	debit_to = ""
-	for row in journal_entry.accounts:
-		if row.get('debit_in_account_currency'):
-			total_amount = flt(row.get('debit_in_account_currency'))
-			account.append(row)
-			journal_entry.append("accounts", row)
-	for invoice in payments:
-		if invoice.get("Type") == "Invoice":
-			invoice_name = frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": invoice.get('qb_si_id') }, "name")
-			
-			invoice = frappe.get_doc("Sales Invoice", invoice_name)
-			account = journal_entry.append("accounts", {})
-			account.credit_in_account_currency = flt(invoice.get('paid_amount'))
-			account.party_type = "Customer"
-			account.party = invoice.get('customer_name')
-			account.account = invoice.get('debit_to')
-			account.reference_type = "Sales Invoice"
-			account.reference_name = invoice_name
-			account.is_advance = "Yes"
-			debit_to = invoice.get('debit_to')
-		
-			# credit_entry['credit_in_account_currency'] = flt(invoice.get('paid_amount'))
-			# credit_entry['party_type'] = "Customer"
-			# credit_entry['party'] = invoice.get('customer_name')
-			# credit_entry['account'] = invoice.get('debit_to')
-			# credit_entry['reference_type'] = "Sales Invoice"
-			# credit_entry['reference_name'] = invoice_name
-			# credit_entry['is_advance'] = "Yes"
-			# account.append(credit_entry)
-		else:
-			account = journal_entry.append("accounts", {})
-			account.credit_in_account_currency = flt(total_amount) - flt(credit_memo.get('paid_amount'))
-			account.account = debit_to
-			account.is_advance = "Yes"
-			# advance_entry['credit_in_account_currency'] = flt(total_amount) - flt(credit_memo.get('paid_amount'))
-			# advance_entry['account'] =  debit_to
-			# advance_entry['is_advance'] = "Yes"
-	account.append(advance_entry)
-	
-	# journal_entry.update("accounts":account)
-	print account, "-------------------"				
 
-	# for row in journal_entry.accounts:
-	# 	if row.get('debit_in_account_currency'):
-	# 		account.extend(row)
-	# journal_entry.update({"account" : account})
+def account_entry(journal_entry, payments, credit_memo):
+	voucher_detail_no = None
+	credit = None
+	for row in journal_entry.accounts:
+		if row.get('credit_in_account_currency') and not row.get('reference_name'):
+			voucher_detail_no = row.get('name')
+			credit = row.get('credit_in_account_currency')
+	print voucher_detail_no, "datatatata"		
 		
+	if voucher_detail_no and credit:
+		lst = []
+		for e in payments:
+			if e.get('qb_si_id') and e.get('Type') == "Invoice":
+				invoice_refrence =frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": e.get('qb_si_id') }, "name")
+				invoice = frappe.get_doc("Sales Invoice", invoice_refrence)
+				lst.append(frappe._dict({
+					'voucher_type' : 'Journal Entry',
+					'voucher_no' : journal_entry.get('name'),
+					'voucher_detail_no' : voucher_detail_no,
+					'against_voucher_type' : 'Sales Invoice',
+					'against_voucher'  : invoice_refrence,
+					'account' : invoice.get('debit_to'),
+					'party_type': "Customer",
+					'party': invoice.get('customer_name'),
+					'is_advance' : "Yes",
+					'dr_or_cr' : "credit_in_account_currency",
+					'unadjusted_amount' : round(credit,2),
+					'allocated_amount' : round(e.get('paid_amount'),2)
+					}))
+		print lst, "datallllll"
+		if lst:
+			from erpnext.accounts.utils import reconcile_against_document
+			reconcile_against_document(lst)
 
 def sync_qb_journal_entry_against_si(get_payment_received):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
@@ -135,7 +119,6 @@ def sync_qb_journal_entry_against_si(get_payment_received):
  		except Exception, e:
  			make_quickbooks_log(title=e.message, status="Error", method="sync_qb_journal_entry_against_si", message=frappe.get_traceback(),
 						request_data=recived_payment, exception=True)
-
 
 def create_payment_entry_si(recived_payment, quickbooks_settings):
 	""" create payment entry against sales Invoice """

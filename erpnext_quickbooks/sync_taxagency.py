@@ -13,12 +13,10 @@ def sync_taxagency(quickbooks_obj):
 	if get_qb_taxagency:
 		sync_qb_taxagency(get_qb_taxagency, quickbooks_taxagency_list)
 
-
 def sync_qb_taxagency(get_qb_taxagency, quickbooks_taxagency_list):
 	for qb_taxagency in get_qb_taxagency:
 		if not frappe.db.get_value("QuickBooks TaxAgency", {"quickbooks_tax_agency_id": qb_taxagency.get('Id')}, "name"):
 			create_taxagency(qb_taxagency, quickbooks_taxagency_list)
-
 
 def create_taxagency(qb_taxagency, quickbooks_taxagency_list):
 	""" store TaxAgency data in ERPNEXT """ 
