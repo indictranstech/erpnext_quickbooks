@@ -97,3 +97,29 @@ def create_tax_head_mapper(tax_head_quickbooks):
 	tax_head_mapper.insert()
 	frappe.db.commit()
 	# return tax_head_mapper.name
+
+@frappe.whitelist()
+def detail_comparison_erp_qb_accounts(company_name):
+	erpnext = frappe.db.sql("""SELECT name, root_type, quickbooks_account_id, company from `tabAccount` 
+				where is_group=0 
+				and company = '{}' 
+				and quickbooks_account_id is NULL 
+				order by root_type""".format(company_name), as_list=1)
+	quickbooks = frappe.db.sql("""SELECT name, root_type, quickbooks_account_id, company from `tabAccount` 
+				where is_group=0 
+				and company = '{}' 
+				and quickbooks_account_id is not NULL 
+				order by root_type""".format(company_name), as_list=1)
+	from collections import defaultdict
+	d = defaultdict(dict)
+	for row in quickbooks:
+		if "QBK" not in d[row[1]]:
+			d[row[1]]["QBK"] = [row[0]]
+		else:
+			d[row[1]]["QBK"].append(row[0])
+	for row in erpnext:
+		if "ERP" not in d[row[1]]:
+			d[row[1]]["ERP"] = [row[0]]
+		else:
+			d[row[1]]["ERP"].append(row[0])
+	return d

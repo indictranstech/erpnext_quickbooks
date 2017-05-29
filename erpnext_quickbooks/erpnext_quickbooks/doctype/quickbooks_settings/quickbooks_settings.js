@@ -8,6 +8,9 @@ frappe.provide("Quickbooks Settings");
 frappe.ui.form.on('Quickbooks Settings', {
 	refresh: function(frm) {
 		var me = this;
+		cur_frm.add_custom_button(__('ERPNext And QuickBooks Charts Of Accounts'), 
+		function() { chart_of_accounts_view_erp_quickbooks(); })
+
 		cur_frm.add_custom_button(__('Charts Of Accounts'), 
 		function() { frappe.set_route("Tree", "Account"); })
 		
@@ -146,24 +149,7 @@ show_mandatory_field = function() {
 	$.each(mandatory , function (key, value) {
 		cur_frm.toggle_reqd(value, true);
 	});
-	// tax_mapper();
 }
-
-// tax_mapper = function() {
-// 	frappe.call({
-// 		method: "erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.quickbooks_tax_head",
-// 		callback: function(r) {
-// 			if(r.message){
-// 				for(var i=0; i<r.message.length ; i++){
-// 					child = frappe.model.add_child(cur_frm.doc, "Tax Head Mapper", "tax_head_mapper")
-// 					child.tax_head_quickbooks= r.message[i][0]
-// 				}
-// 					refresh_field("tax_head_mapper");
-// 				}
-// 			}
-// 		});
-// }
-
 
 tax_mapper = function() {
 	frappe.call({
@@ -174,4 +160,28 @@ tax_mapper = function() {
 				}
 			}
 		});
+}
+
+chart_of_accounts_view_erp_quickbooks = function() {
+	dialog = new frappe.ui.Dialog({
+		width: 1100,
+		title: "<b>ERPNext And QuickBooks Charts Of Accounts</b>",
+		fields:[
+			{fieldtype: 'HTML',
+				fieldname:'chart_of_accounts', label: __("Chart of Accounts")
+			}
+		]
+	});	
+	dialog.show();
+	$(dialog.body).parents(':eq(1)').css({"width":"60%"});
+	frappe.call({
+	method: "erpnext_quickbooks.erpnext_quickbooks.doctype.quickbooks_settings.quickbooks_settings.detail_comparison_erp_qb_accounts",
+	args:{ 
+		"company_name": frappe.defaults.get_default("Company")},
+	callback: function(r) {
+			if(r.message){
+				$(dialog.body).find("[data-fieldname='chart_of_accounts']").html(frappe.render_template("charts_of_accounts_erpnext_quickbooks", {data: r.message}))
+			}
+		}
+	});
 }
