@@ -7,7 +7,7 @@ def get_data():
 		{
 			"module_name": "Erpnext Quickbooks",
 			"color": "grey",
-			"icon": "icon-truck",
+			"icon": "fa fa-fax",
 			"type": "module",
 			"label": _("Erpnext Quickbooks")
 		}

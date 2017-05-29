@@ -33,8 +33,6 @@ def create_journal_entry(qb_journal_entry, quickbooks_journal_entry_list=[]):
 			journal.naming_series = "JE-Quickbooks-"
 			journal.posting_date = qb_journal_entry.get('TxnDate')
 			get_journal_entry_account(journal,qb_journal_entry)
-			journal.cheque_no ="dummy check"
-			journal.cheque_date =qb_journal_entry.get('TxnDate')
 			journal.flags.ignore_mandatory = True
 			journal.save()
 			journal.submit()

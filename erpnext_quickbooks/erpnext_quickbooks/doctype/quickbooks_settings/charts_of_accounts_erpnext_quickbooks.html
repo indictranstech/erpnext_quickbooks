@@ -1,0 +1,22 @@
+<div class="data-table" style="height: 500px; overflow: auto;">
+	{% for(var i=0, l=Object.keys(data).length; i < l; i++) { %}
+	<h3>{{ Object.keys(data)[i] }} </h3>
+	<table class="table table-bordered table-hover">
+		<tr>
+			<th>ERPNext Accounts</th>
+			<th>QuickBooks Accounts</th>
+
+		</tr>
+	{% for(var j=0, k=Math.max(data[Object.keys(data)[i]]["QBK"].length, data[Object.keys(data)[i]]["ERP"].length); j < k; j++) { %}
+		<tr style="line-height: 1; font-size: 14px; margin-bottom:0px;">
+			<td style="width: 20px; padding-bottom:3px;padding-left:3px;padding-right:3px; line-height: 1;">
+				{{ data[Object.keys(data)[i]]["ERP"][j] }}
+			</td>
+			<td style="width: 20px; padding-bottom:3px;padding-left:3px;padding-right:3px; line-height: 1;">
+				{{ data[Object.keys(data)[i]]["QBK"][j] }} 
+			</td>
+		</tr>
+	{% } %}
+	</table>
+	{% } %}
+</div>

@@ -2,25 +2,22 @@ from __future__ import unicode_literals
 import frappe
 from frappe import _
 import requests.exceptions
-from .utils import make_quickbooks_log
+from .utils import make_quickbooks_log, pagination
 from pyqb.quickbooks.batch import batch_create, batch_delete
 from pyqb.quickbooks.objects.customer import Customer 
 
 def sync_customers(quickbooks_obj):
 	"""Fetch Customer data from QuickBooks"""
 	quickbooks_customer_list = []
-	customer_query = """SELECT * FROM  Customer""" 
-	qb_customer = quickbooks_obj.query(customer_query)
-	if qb_customer['QueryResponse']:
-		get_qb_customer =  qb_customer['QueryResponse']['Customer']
+	business_objects = "Customer"
+	get_qb_customer = pagination(quickbooks_obj, business_objects)
+	if get_qb_customer:
 		sync_qb_customers(get_qb_customer,quickbooks_customer_list)
 	
 def sync_qb_customers(get_qb_customer, quickbooks_customer_list):
 	for qb_customer in get_qb_customer:
-		# if not frappe.db.get_value("Customer", {"quickbooks_cust_id": [qb_customer.get('Id'), qb_customer.get('value')]}, "name"):
 		if not frappe.db.get_value("Customer", {"quickbooks_cust_id": qb_customer.get('Id')}, "name"):
 			create_customer(qb_customer, quickbooks_customer_list)
-
 
 def create_customer(qb_customer, quickbooks_customer_list):
 	""" store Customer data in ERPNEXT """ 
@@ -34,10 +31,16 @@ def create_customer(qb_customer, quickbooks_customer_list):
 			"customer_group" : _("Commercial"),
 			"default_currency" : qb_customer['CurrencyRef'].get('value','') if qb_customer.get('CurrencyRef') else '',
 			"territory" : _("All Territories"),
-		}).insert()
+			"accounts" : get_party_account(qb_customer)
+		})
+		customer.flags.ignore_mandatory = True
+		customer.insert()
 		
-		# if customer and qb_customer.get('BillAddr'):
-		# 	create_customer_address(customer, qb_customer.get("BillAddr"))
+		if customer and qb_customer.get('BillAddr'):
+			create_customer_address(qb_customer, customer, qb_customer.get("BillAddr"), "Billing", 1)
+		if customer and qb_customer.get('ShipAddr'):
+			create_customer_address(qb_customer, customer, qb_customer.get("ShipAddr"), "Shipping", 2)
+
 		frappe.db.commit()
 		quickbooks_customer_list.append(customer.quickbooks_cust_id)
 
@@ -50,35 +53,52 @@ def create_customer(qb_customer, quickbooks_customer_list):
 	
 	return quickbooks_customer_list
 
+def get_party_account(qb_customer):
+	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
+	party_account = []
+	party_currency = qb_customer.get('CurrencyRef').get('value') if qb_customer.get('CurrencyRef') else ''
+	debtors_account = frappe.db.get_value("Account", {"account_currency": party_currency, 'account_type': 'Receivable',\
+		"company": quickbooks_settings.select_company, "root_type": "Asset"}, "name")
+	if party_currency and debtors_account:
+		party_account.append({
+			"company": quickbooks_settings.select_company,
+			"account": debtors_account
+			})
+	return party_account
 
-def create_customer_address(customer, address):
-	address_title, address_type = get_address_title_and_type(customer.customer_name)
+def create_customer_address(qb_customer, customer, address, type_of_address, index):
+	address_title, address_type = get_address_title_and_type(customer.customer_name, type_of_address, index)
+	qb_id = str(address.get("Id")) + str(address_type)
 	try :
-		frappe.get_doc({
+		customer_address = frappe.get_doc({
 			"doctype": "Address",
-			"quickbooks_address_id": address.get("Id"),
+			"quickbooks_address_id": qb_id,
 			"address_title": address_title,
 			"address_type": address_type,
-			"address_line1": address.get("Line1"),
+			"address_line1": address.get("Line1")[:35] if address.get("Line1") else '',
+			"address_line2": address.get("Line1")[35:70] if address.get("Line1") else '',
 			"city": address.get("City"),
 			"state": address.get("CountrySubDivisionCode"),
 			"pincode": address.get("PostalCode"),
-			"country": frappe.db.get_value("Country",{"code":address.get("CountrySubDivisionCode")},"name"),
-			"email_id": address.get("PrimaryEmailAddr"),
+			"country": address.get("Country"),
+			"email_id": qb_customer.get('PrimaryEmailAddr').get('Address') if qb_customer.get('PrimaryEmailAddr') else '',
+			"phone" : qb_customer.get('Mobile').get('FreeFormNumber') if qb_customer.get('Mobile') else '',
 			"customer": customer.name,
 			"customer_name":  customer.customer_name
-		}).insert()
+		})
+		customer_address.flags.ignore_mandatory = True
+		customer_address.insert()
 			
 	except Exception, e:
 		make_quickbooks_log(title=e.message, status="Error", method="create_customer_address", message=frappe.get_traceback(),
 				request_data=address, exception=True)
 		raise e
 	
-def get_address_title_and_type(customer_name):
-	address_type = _("Billing")
+def get_address_title_and_type(customer_name, type_of_address, index):
+	address_type = _(type_of_address)
 	address_title = customer_name
 	if frappe.db.get_value("Address", "{0}-{1}".format(customer_name.strip(), address_type)):
-		address_title = "{0}".format(customer_name.strip())
+		address_title = "{0}-{1}".format(customer_name.strip(), index)
 		
 	return address_title, address_type 
 
