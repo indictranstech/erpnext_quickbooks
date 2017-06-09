@@ -28,7 +28,7 @@ def create_Item(qb_item, quickbooks_item_list):
 		item = frappe.get_doc({
 			"doctype": "Item",
 			"quickbooks_item_id" : cstr(qb_item.get('Id')),
-			"item_code" : cstr(qb_item.get('Name')) or cstr(qb_item.get('Id')),
+			"item_code" : cstr(qb_item.get('Id')),
 			"item_name" : cstr(qb_item.get('Name')),
 			"is_stock_item" : False if qb_item.get('Type') == 'NonInventory' or qb_item.get('Type') == 'Service' else True,
 			"stock_uom" : _("Nos"),
