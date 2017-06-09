@@ -59,7 +59,7 @@ def create_stock_entry(qb_credit_note, quickbooks_settings, quickbooks_credit_no
 		if items:
 			stock_entry = frappe.get_doc({
 				"doctype": "Stock Entry",
-				"naming_series" : "CN-SE-Qb-",
+				"naming_series" : "CN-SE-QB-",
 				"quickbooks_credit_memo_id" : str(qb_credit_note.get("Id"))+"-"+"CN",
 				"posting_date" : qb_credit_note.get('TxnDate'),
 				"purpose": "Material Receipt",

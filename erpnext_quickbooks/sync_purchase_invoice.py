@@ -124,10 +124,10 @@ def tax_apply_on_account_details(qb_orders, order_items, quickbooks_settings, st
 				if json.loads(i['item_tax_rate']).keys():
 					account_head = json.loads(i['item_tax_rate']).keys()[0]  
 
-					if account_head in set(account_head_list) and float(i['quickbooks__tax_code_value']) != 0.0:
-						taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+					if account_head in set(account_head_list) and flt(i['quickbooks__tax_code_value']) != 0.0:
+						taxes_rate_list[account_head] += flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 					elif i['quickbooks__tax_code_value'] != 0 and account_head != (None or ""):
-						taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+						taxes_rate_list[account_head] = flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 						account_head_list.append(account_head)
 
 			if qb_orders.get('TxnTaxDetail'): invoice_total_tax = qb_orders.get('TxnTaxDetail').get('TotalTax')
@@ -163,10 +163,10 @@ def calculate_tax_amount(qb_orders, order_items, quickbooks_settings, stock_item
 		if json.loads(i['item_tax_rate']).keys(): 
 			account_head = json.loads(i['item_tax_rate']).keys()[0]
 
-			if account_head in account_head_list and float(i['quickbooks__tax_code_value']) != 0.0:
-				taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+			if account_head in account_head_list and flt(i['quickbooks__tax_code_value']) != 0.0:
+				taxes_rate_list[account_head] += flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 			elif i['quickbooks__tax_code_value'] != 0 and account_head != (None or ""):
-				taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+				taxes_rate_list[account_head] = flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 				account_head_list.add(account_head)
 
 	if taxes_rate_list:
@@ -211,10 +211,10 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings, stock_i
 				if json.loads(i['item_tax_rate']).keys(): 
 					account_heads = json.loads(i['item_tax_rate']).keys()[0]
 
-					if account_heads in set(account_head_tax_list) and float(i['quickbooks__tax_code_value']) != 0.0:
-						account_expenses_tax[account_heads] += float(i['quickbooks__tax_code_value']*i['rate']*1/100)
+					if account_heads in set(account_head_tax_list) and flt(i['quickbooks__tax_code_value']) != 0.0:
+						account_expenses_tax[account_heads] += flt(i['quickbooks__tax_code_value']*i['rate']*1/100)
 					elif i['quickbooks__tax_code_value'] != 0 and account_heads != (None or ""):
-						account_expenses_tax[account_heads] = float(i['quickbooks__tax_code_value']*i['rate']*1/100)
+						account_expenses_tax[account_heads] = flt(i['quickbooks__tax_code_value']*i['rate']*1/100)
 						account_head_tax_list.append(account_heads)
 
 			taxes_on_account_details = []
@@ -256,9 +256,9 @@ def get_order_items(qb_orders, order_items, quickbooks_settings, stock_item):
 			item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = item_based_expense_line_detail_tax_code_ref(qb_orders, qb_item, quickbooks_settings)
 			item_code = get_item_code(qb_item)
 			items.append({
-				"item_code": item_code if item_code else '',
-				"item_name": item_code if item_code else qb_item.get('Description')[:35],
-				"description":qb_item.get('Description') if qb_item.get('Description') else '',
+				"item_code": item_code.get('item_code'),
+				"item_name": item_code.get('item_name') if item_code else item_code.get('item_code'),
+				"description":qb_item.get('Description') if qb_item.get('Description') else item_code.get('item_name'),
 				"rate": qb_item.get('ItemBasedExpenseLineDetail').get('UnitPrice'),
 				"qty": qb_item.get('ItemBasedExpenseLineDetail').get('Qty'),
 				"expense_account": quickbooks_settings.expense_account,
@@ -371,7 +371,7 @@ def get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings):
 
 def get_item_code(qb_item):
 	quickbooks_item_id = qb_item.get('ItemBasedExpenseLineDetail').get('ItemRef').get('value') if qb_item.get('ItemBasedExpenseLineDetail') else ''
-	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, "item_code")
+	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, ["item_code","item_name"],as_dict=1)
 	return item_code
 
 def get_tax_account_head():

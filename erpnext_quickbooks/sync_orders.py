@@ -162,9 +162,9 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings):
 		for i in get_order_items(order_items, quickbooks_settings):
 			account_head =json.loads(i['item_tax_rate']).keys()[0] if json.loads(i['item_tax_rate']).keys() else '' 
 			if account_head in account_head_list and i['quickbooks__tax_code_value'] != 0:
-				taxes_rate_list[account_head] += float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+				taxes_rate_list[account_head] += flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 			elif i['quickbooks__tax_code_value'] != 0:
-				taxes_rate_list[account_head] = float(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
+				taxes_rate_list[account_head] = flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 				account_head_list.add(account_head)
 
 		if taxes_rate_list:
@@ -191,9 +191,9 @@ def get_order_items(order_items, quickbooks_settings):
 		 	item_tax_rate, quickbooks_tax_code_ref, quickbooks__tax_code_value = tax_code_ref(qb_item, quickbooks_settings)
 			item_code = get_item_code(qb_item)
 			items.append({
-				"item_code": item_code if item_code else '',
-				"item_name": item_code if item_code else qb_item.get('Description')[:35],
-				"description": qb_item.get('Description') if qb_item.get('Description') else '',
+				"item_code": item_code.get('item_code'),
+				"item_name": item_code.get('item_name') if item_code else item_code.get('item_code'),
+				"description": qb_item.get('Description') if qb_item.get('Description') else item_code.get('item_name'),
 				"rate": qb_item.get('SalesItemLineDetail').get('UnitPrice') if qb_item.get('SalesItemLineDetail').get('UnitPrice') else qb_item.get('Amount'),
 				"qty": qb_item.get('SalesItemLineDetail').get('Qty') if qb_item.get('SalesItemLineDetail').get('Qty') else 1,
 				"income_account": quickbooks_settings.cash_bank_account,
@@ -221,9 +221,9 @@ def get_order_shipping_detail(order_items, quickbooks_settings):
 			Shipping.append({
 				"charge_type": _("Actual"),
 				"account_head": item_tax_rate.keys()[0],
-				"description": _("Tax applied on shipping {}".format(float(quickbooks__tax_code_value * qb_item.get('Amount')/100))),
+				"description": _("Tax applied on shipping {}".format(flt(quickbooks__tax_code_value * qb_item.get('Amount')/100))),
 				"rate": 0,
-				"tax_amount": float(quickbooks__tax_code_value * qb_item.get('Amount')/100)
+				"tax_amount": flt(quickbooks__tax_code_value * qb_item.get('Amount')/100)
 				})
 	return Shipping
 
@@ -257,7 +257,7 @@ def get_item_code(qb_item):
 	#item_code = frappe.db.get_value("Item", {"quickbooks_variant_id": qb_item.get("variant_id")}, "item_code")
 	#if not item_code:
 	quickbooks_item_id = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else ''
-	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, "item_code")
+	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id}, ["item_code","item_name"],as_dict=1)
 	return item_code
 
 from pyqb.quickbooks.batch import batch_create, batch_delete

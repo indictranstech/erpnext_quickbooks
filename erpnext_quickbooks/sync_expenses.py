@@ -99,7 +99,7 @@ def create_debit_entry(exp, expenses, quickbooks_settings):
 			
 			if account_ref.get('account_currency') == company_currency:
 				exchange_rate = 1
-				amount = row.get('Amount')  * expenses.get('ExchangeRate')
+				amount = row.get('Amount') * expenses.get('ExchangeRate')
 			else:
 				exchange_rate = expenses.get('ExchangeRate')
 				amount = row.get('Amount') 
@@ -187,8 +187,14 @@ def get_account_detail(quickbooks_account_id):
 
 def get_tax_account(expenses, quickbooks_tax_rate_id, quickbooks_settings):
 	if not expenses.get('GlobalTaxCalculation') == 'NotApplicable':
-		individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent 
-					from  `tabQuickBooks TaxRate` as qbr where qbr.tax_rate_id = {}""".format(quickbooks_tax_rate_id),as_dict=1)
+		query = """
+				select 
+					qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent 
+				from 
+					`tabQuickBooks TaxRate` as qbr 
+				where 
+					qbr.tax_rate_id = {}""".format(quickbooks_tax_rate_id)
+		individual_item_tax =  frappe.db.sql(query, as_dict=1)
 		tax_head = individual_item_tax[0]['tax_head']
 		tax_account = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
 	return tax_account
