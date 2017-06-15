@@ -166,7 +166,6 @@ def get_creditors_debtors_account(account, party_ref, quickbooks_settings):
 		debtors_account = frappe.db.get_value("Account", {"account_currency": party_ref.get('default_currency'), 'account_type': 'Payable', "root_type": "Liability"}, "name")
 		account.account = debtors_account if debtors_account else frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "default_payable_account")
 		account.account_currency = party_ref.get('default_currency')
-		# print account.account, "--------------------",account.account_currency
 	elif party_ref.get('party_type') == 'Customer':
 		creditors_account = frappe.db.get_value("Account", {"account_currency": party_ref.get('default_currency'), 'account_type': 'Receivable', "root_type": "Asset"}, "name")
 		account.account = creditors_account if creditors_account else frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "default_receivable_account")

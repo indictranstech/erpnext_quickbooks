@@ -30,6 +30,7 @@ def create_Item(qb_item, quickbooks_item_list):
 			"quickbooks_item_id" : cstr(qb_item.get('Id')),
 			"item_code" : cstr(qb_item.get('Id')),
 			"item_name" : cstr(qb_item.get('Name')),
+			"valuation_rate" : 0 if qb_item.get('Type') == 'NonInventory' or qb_item.get('Type') == 'Service' else 0.01,
 			"is_stock_item" : False if qb_item.get('Type') == 'NonInventory' or qb_item.get('Type') == 'Service' else True,
 			"stock_uom" : _("Nos"),
 			"item_group" : _("Consumable"),

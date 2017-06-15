@@ -8,7 +8,6 @@ from pyqb.quickbooks.objects.vendor import Vendor
 
 def sync_suppliers(quickbooks_obj):
 	""" Fetch Supplier data from QuickBooks"""
-	
 	quickbooks_supplier_list = []
 	business_objects = "Vendor"
 	get_qb_supplier =  pagination(quickbooks_obj, business_objects)

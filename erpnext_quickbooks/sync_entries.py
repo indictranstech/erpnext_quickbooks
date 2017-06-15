@@ -76,7 +76,7 @@ def get_credit_note_dict(entries, line):
 		'qb_si_id': line.get('LinkedTxn')[0].get('TxnId') if line.get('LinkedTxn')[0].get('TxnType') == "Invoice" else None,
 		'paid_amount': flt(line.get('Amount')),
 		"doc_no": entries.get("DocNumber"),
-		"credit_not_id" : line.get('LinkedTxn')[0].get('TxnId')+"CE" if line.get('LinkedTxn')[0].get('TxnType') == "CreditMemo" else None,
+		"credit_note_id" : line.get('LinkedTxn')[0].get('TxnId')+"CE" if line.get('LinkedTxn')[0].get('TxnType') == "CreditMemo" else None,
 		"customer_name" : frappe.db.get_value("Customer",{"quickbooks_cust_id":entries['CustomerRef'].get('value')},"name")
 	}
 
@@ -86,12 +86,13 @@ def adjust_je_against_cn(payments):
 		if len(value['credit_notes']) == 1:
 			for cn in value['credit_notes']:
 				lst = []
-				args = get_jv_voucher_detail_no(cn)
+				quickbooks_journal_entry_id = cn.get('credit_note_id')
+				args = get_jv_voucher_detail_no(quickbooks_journal_entry_id)
 				si_name =frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": value.get('qb_si_id'),
 				"outstanding_amount":['!=',0] }, "name")
 				if args.get('voucher_detail_no') and args.get('unadjusted_amount') and si_name:
 					invoice = frappe.get_doc("Sales Invoice", si_name)
-					lst.append(frappe._dict(reconcile_entry(args, si_name,
+					lst.append(frappe._dict(reconcile_entry(args, "Sales Invoice", si_name,
 						invoice, paid_amt=value.get('paid_amount'))))
 				if lst:
 					from erpnext.accounts.utils import reconcile_against_document
@@ -100,38 +101,51 @@ def adjust_je_against_cn(payments):
 		elif len(value['credit_notes']) > 1:
 			for cn in value['credit_notes']:
 				lst1 = []
-				args = get_jv_voucher_detail_no(cn)
+				quickbooks_journal_entry_id = cn.get('credit_note_id')
+				args = get_jv_voucher_detail_no(quickbooks_journal_entry_id)
 				si_name =frappe.db.get_value("Sales Invoice", {"quickbooks_invoce_id": value.get('qb_si_id'),
 				"outstanding_amount":['!=',0] }, "name")
 				if args.get('voucher_detail_no') and args.get('unadjusted_amount') and si_name:
 					invoice = frappe.get_doc("Sales Invoice", si_name)
-					lst1.append(frappe._dict(reconcile_entry(args, si_name,
+					lst1.append(frappe._dict(reconcile_entry(args, "Sales Invoice", si_name,
 						invoice, paid_amt=cn.get('paid_amount'))))
 				if lst1:
 					from erpnext.accounts.utils import reconcile_against_document
 					reconcile_against_document(lst1)
 					frappe.db.commit()
 
-def reconcile_entry(args, si_name, invoice, paid_amt=None):
+
+def reconcile_entry(args, invoice_type , invoice_name, invoice, paid_amt=None):
+	if invoice_type == "Purchase Invoice":
+		dr_or_cr = "debit_in_account_currency"
+		party_type = "Supplier"
+		party = invoice.get('supplier_name')
+		account = invoice.get("credit_to")
+	elif invoice_type == "Sales Invoice":
+		dr_or_cr = "credit_in_account_currency"
+		party_type = "Customer"
+		party = invoice.get('customer_name')
+		account = invoice.get('debit_to')
 	return {
 		'voucher_type' : 'Journal Entry',
 		'voucher_no' : args.get('voucher_no'),
 		'voucher_detail_no' : args.get('voucher_detail_no'),
-		'against_voucher_type' : 'Sales Invoice',
-		'against_voucher'  : si_name,
-		'account' : invoice.get('debit_to'),
-		'party_type': "Customer",
-		'party': invoice.get('customer_name'),
+		'against_voucher_type' : invoice_type,
+		'against_voucher'  : invoice_name,
+		'account' : account,
+		'party_type': party_type,
+		'party': party,
 		'is_advance' : "Yes",
-		'dr_or_cr' : "credit_in_account_currency",
+		'dr_or_cr' : dr_or_cr,
 		'unadjusted_amount' : round(args.get('unadjusted_amount'),2),
 		'allocated_amount' : round(paid_amt,2)
-	}	
+	}
 
-def get_jv_voucher_detail_no(cn):
+
+def get_jv_voucher_detail_no(quickbooks_journal_entry_id):
 	account_dict ={}
 	jv_name = frappe.db.get_value("Journal Entry",
-		{"quickbooks_journal_entry_id": cn.get('credit_not_id')}, "name")
+		{"quickbooks_journal_entry_id": quickbooks_journal_entry_id}, "name")
 	jv = frappe.get_doc("Journal Entry", jv_name)
 
 	if jv.get('voucher_type') == 'Credit Note':
@@ -213,11 +227,12 @@ def sync_pi_payment(quickbooks_obj):
 	business_objects = "BillPayment"
 	get_qb_billpayment = pagination(quickbooks_obj, business_objects)
 	if get_qb_billpayment:  
-		get_bill_pi= validate_pi_payment(get_qb_billpayment)
+		get_bill_pi = get_bill_payment_dict(get_qb_billpayment)
 		if get_bill_pi:
 			sync_qb_journal_entry_against_pi(get_bill_pi)
+		get_payments_against_debit_entries(get_qb_billpayment)
 
-def validate_pi_payment(get_qb_billpayment):
+def get_bill_payment_dict(get_qb_billpayment):
 	paid_pi = []
 	for entries in get_qb_billpayment:
 		for linked_txn in entries['Line']:
@@ -236,6 +251,90 @@ def validate_pi_payment(get_qb_billpayment):
 					"doc_no": entries.get("DocNumber")
 					})
 	return paid_pi
+
+
+def get_vendor_debit_dict(entries, line):
+	return {
+		'Id': entries.get('Id')+"-"+'PI'+"-"+line.get('LinkedTxn')[0].get('TxnId'),
+		'Type':	line.get('LinkedTxn')[0].get('TxnType'),
+		'ExchangeRate': entries.get('ExchangeRate'),
+		'Amount': flt(line.get('Amount')*entries.get('ExchangeRate'), 2),
+		'TxnDate': entries.get('TxnDate'),
+		'qb_pi_id': line.get('LinkedTxn')[0].get('TxnId') if line.get('LinkedTxn')[0].get('TxnType') == "Bill" else None,
+		'paid_amount': flt(line.get('Amount')),
+		"doc_no": entries.get("DocNumber"),
+		"vendor_credit_id" : line.get('LinkedTxn')[0].get('TxnId')+"DE" if line.get('LinkedTxn')[0].get('TxnType') == "VendorCredit" else None,
+	}
+
+def adjust_debit_entries(payment_against_debit_note):
+	for entries in payment_against_debit_note:
+		payments, vendor_credit = {}, [] 
+		for line in entries['Line']:
+			payment_dict = get_vendor_debit_dict(entries, line)
+			if line.get('LinkedTxn')[0].get('TxnType') == "Bill":
+				payments[payment_dict.get("qb_pi_id")] = payment_dict
+				payments[payment_dict.get("qb_pi_id")]["vendor_credit"] = []
+			else:
+				vendor_credit.append(payment_dict)
+		
+		for row in payments:
+			payments[row]["vendor_credit"].extend(vendor_credit)
+		
+		if payments:
+			adjust_je_against_dn(payments)
+
+def get_payments_against_debit_entries(get_qb_payment):
+	"""Get payment entries against credit note"""
+	try:
+		payment_against_debit_note = []
+		for entries in get_qb_payment:
+			if not entries.get('CheckPayment').get('BankAccountRef'):
+				payment_against_debit_note.append(entries);
+		if payment_against_debit_note:
+			adjust_debit_entries(payment_against_debit_note)
+	except Exception, e:
+ 			make_quickbooks_log(title=e.message, status= "Error", method="get_payments_against_debit_entries", message=frappe.get_traceback(),
+						request_data= get_qb_payment, exception= True)
+
+def adjust_je_against_dn(payments):
+	""" Adjust Journal Entries against Debit Note """
+	try :
+		for pi, value in payments.iteritems():
+			if len(value['vendor_credit']) == 1:
+				for dn in value['vendor_credit']:
+					lst = []
+					quickbooks_journal_entry_id = dn.get('vendor_credit_id')
+					args = get_jv_voucher_detail_no(quickbooks_journal_entry_id)
+					pi_name =frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": value.get('qb_pi_id'),
+					"outstanding_amount":['!=',0] }, "name")
+					if args.get('voucher_detail_no') and args.get('unadjusted_amount') and pi_name:
+						invoice = frappe.get_doc("Purchase Invoice", pi_name)
+						lst.append(frappe._dict(reconcile_entry(args, "Purchase Invoice", pi_name,
+							invoice, paid_amt=value.get('paid_amount'))))
+					if lst:
+						from erpnext.accounts.utils import reconcile_against_document
+						reconcile_against_document(lst)
+						frappe.db.commit()
+			elif len(value['vendor_credit']) > 1:
+				for dn in value['vendor_credit']:
+					lst1 = []
+					quickbooks_journal_entry_id = dn.get('vendor_credit_id')
+					args = get_jv_voucher_detail_no(quickbooks_journal_entry_id)
+					pi_name =frappe.db.get_value("Purchase Invoice", {"quickbooks_purchase_invoice_id": value.get('qb_pi_id'),
+					"outstanding_amount":['!=',0] }, "name")
+					if args.get('voucher_detail_no') and args.get('unadjusted_amount') and pi_name:
+						invoice = frappe.get_doc("Purchase Invoice", pi_name)
+						lst1.append(frappe._dict(reconcile_entry(args, "Purchase Invoice", pi_name,
+							invoice, paid_amt=dn.get('paid_amount'))))
+					if lst1:
+						from erpnext.accounts.utils import reconcile_against_document
+						reconcile_against_document(lst1)
+						frappe.db.commit()
+	except Exception, e:
+		make_quickbooks_log(title=e.message, status="Error", method="adjust_je_against_dn", message=frappe.get_traceback(),
+						request_data=payments, exception=True)
+
+
 
 def sync_qb_journal_entry_against_pi(get_bill_pi):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
@@ -327,3 +426,20 @@ def get_deduction(dt= None, pay_entry_obj= None, ref_doc= None, ref_pay= None, q
 def get_account_detail(quickbooks_account_id):
 	""" account for payment """
 	return frappe.db.get_value("Account", {"quickbooks_account_id": quickbooks_account_id}, ["name", "account_currency"], as_dict=1)
+
+# def reconcile_entry(args, si_name, invoice, paid_amt=None):
+# 	return {
+# 		'voucher_type' : 'Journal Entry',
+# 		'voucher_no' : args.get('voucher_no'),
+# 		'voucher_detail_no' : args.get('voucher_detail_no'),
+# 		'against_voucher_type' : 'Sales Invoice',
+# 		'against_voucher'  : si_name,
+# 		'account' : invoice.get('debit_to'),
+# 		'party_type': "Customer",
+# 		'party': invoice.get('customer_name'),
+# 		'is_advance' : "Yes",
+# 		'dr_or_cr' : "credit_in_account_currency",
+# 		'unadjusted_amount' : round(args.get('unadjusted_amount'),2),
+# 		'allocated_amount' : round(paid_amount,2)
+# 	}	
+

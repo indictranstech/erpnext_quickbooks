@@ -90,7 +90,7 @@ def get_item_stock(order_items, quickbooks_settings):
 	return items
 
 def get_item_code(qb_item):
-	quickbooks_item_id = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else ''
+	quickbooks_item_id = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else None
 	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id, "is_stock_item":1}, "item_code")
 	return item_code
 
