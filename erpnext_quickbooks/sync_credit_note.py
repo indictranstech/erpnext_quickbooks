@@ -59,7 +59,7 @@ def create_stock_entry(qb_credit_note, quickbooks_settings, quickbooks_credit_no
 		if items:
 			stock_entry = frappe.get_doc({
 				"doctype": "Stock Entry",
-				"naming_series" : "CN-SE-Qb-",
+				"naming_series" : "CN-SE-QB-",
 				"quickbooks_credit_memo_id" : str(qb_credit_note.get("Id"))+"-"+"CN",
 				"posting_date" : qb_credit_note.get('TxnDate'),
 				"purpose": "Material Receipt",
@@ -90,7 +90,7 @@ def get_item_stock(order_items, quickbooks_settings):
 	return items
 
 def get_item_code(qb_item):
-	quickbooks_item_id = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else ''
+	quickbooks_item_id = qb_item.get('SalesItemLineDetail').get('ItemRef').get('value') if qb_item.get('SalesItemLineDetail') else None
 	item_code = frappe.db.get_value("Item", {"quickbooks_item_id": quickbooks_item_id, "is_stock_item":1}, "item_code")
 	return item_code
 

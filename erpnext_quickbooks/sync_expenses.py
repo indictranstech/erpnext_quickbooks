@@ -99,7 +99,7 @@ def create_debit_entry(exp, expenses, quickbooks_settings):
 			
 			if account_ref.get('account_currency') == company_currency:
 				exchange_rate = 1
-				amount = row.get('Amount')  * expenses.get('ExchangeRate')
+				amount = row.get('Amount') * expenses.get('ExchangeRate')
 			else:
 				exchange_rate = expenses.get('ExchangeRate')
 				amount = row.get('Amount') 
@@ -112,31 +112,52 @@ def party_credit_debit_entry(exp, expenses, quickbooks_settings):
 	company_currency = frappe.db.get_value("Company", {"name": company_name}, "default_currency")
 	party_ref = get_party_type(expenses)
 	if party_ref:
-		party_debit(exp, expenses, party_ref, quickbooks_settings, company_currency)
-		party_credit(exp, expenses, party_ref, quickbooks_settings, company_currency)
-
-def party_debit(exp, expenses, party_ref, quickbooks_settings, company_currency):
-	# total_tax = expenses.get('TxnTaxDetail').get('TotalTax') if expenses.get('TxnTaxDetail') else 0
-	if party_ref.get('default_currency') == company_currency:
-		exchange_rate = 1
-		debit_amount = expenses.get('TotalAmt') * expenses.get('ExchangeRate')
-	else:
-		exchange_rate = expenses.get('ExchangeRate')
-		debit_amount = expenses.get('TotalAmt')
+		party_advance_entry(exp, expenses, party_ref, quickbooks_settings, company_currency)
 	
-	if party_ref:
-		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings = quickbooks_settings, debit_in_account_currency=debit_amount , credit_in_account_currency = None, exchange_rate = exchange_rate, is_advance= "Yes")
+def party_advance_entry(exp, expenses, party_ref, quickbooks_settings, company_currency):
+	if party_ref.get('party_type') == "Customer":
+		if party_ref.get('default_currency') == company_currency:
+			exchange_rate = 1
+			customer_advance_amt = expenses.get('TotalAmt') * expenses.get('ExchangeRate')
+		else:
+			exchange_rate = expenses.get('ExchangeRate')
+			customer_advance_amt = expenses.get('TotalAmt')
 
-def party_credit(exp, expenses, party_ref, quickbooks_settings, company_currency):
-	if party_ref.get('default_currency') == company_currency:
-		exchange_rate = 1
-		credit_amount =  expenses.get('TotalAmt')  * expenses.get('ExchangeRate')
-	else:
-		exchange_rate = expenses.get('ExchangeRate')
-		credit_amount = expenses.get('TotalAmt')
+		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings = quickbooks_settings, 
+			debit_in_account_currency=None, credit_in_account_currency = customer_advance_amt, 
+			exchange_rate = exchange_rate, is_advance= "Yes")
+		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings= quickbooks_settings, 
+			debit_in_account_currency=customer_advance_amt, credit_in_account_currency = None, 
+			exchange_rate = exchange_rate, is_advance= "No")
+	elif party_ref.get('party_type') == "Supplier":
+		if party_ref.get('default_currency') == company_currency:
+			exchange_rate = 1
+			supp_advance_amt = expenses.get('TotalAmt') * expenses.get('ExchangeRate')
+		else:
+			exchange_rate = expenses.get('ExchangeRate')
+			supp_advance_amt = expenses.get('TotalAmt')
 
-	if party_ref:
-		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings= quickbooks_settings, debit_in_account_currency=None , credit_in_account_currency = credit_amount, exchange_rate = exchange_rate, is_advance= "No")
+		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings = quickbooks_settings, 
+			debit_in_account_currency=supp_advance_amt, credit_in_account_currency = None, 
+			exchange_rate = exchange_rate, is_advance= "Yes")
+		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings= quickbooks_settings, 
+			debit_in_account_currency=None, credit_in_account_currency = supp_advance_amt, 
+			exchange_rate = exchange_rate, is_advance= "No")
+
+
+def append_row_party_detail(exp= None, party_ref=None, quickbooks_settings= None, debit_in_account_currency=None, credit_in_account_currency=None, exchange_rate = None, is_advance= None):
+	account = exp.append("accounts", {})
+	account.party_type =  party_ref.get('party_type')
+	account.party = party_ref.get('name')
+	account.is_advance = is_advance
+	account.exchange_rate = exchange_rate
+	get_creditors_debtors_account(account, party_ref, quickbooks_settings)
+	if debit_in_account_currency != None and debit_in_account_currency != 0:
+		account.debit_in_account_currency = flt(debit_in_account_currency , account.precision("debit_in_account_currency"))
+		
+	if credit_in_account_currency != None and debit_in_account_currency != 0:
+		account.credit_in_account_currency = flt(credit_in_account_currency , account.precision("credit_in_account_currency"))
+
 
 def append_row(exp= None, qb_account=None, debit_in_account_currency=None, credit_in_account_currency=None, exchange_rate = None):
 	account = exp.append("accounts", {})
@@ -148,25 +169,11 @@ def append_row(exp= None, qb_account=None, debit_in_account_currency=None, credi
 	if credit_in_account_currency != None and credit_in_account_currency != 0:
 		account.credit_in_account_currency = flt(credit_in_account_currency , account.precision("credit_in_account_currency"))
 
-def append_row_party_detail(exp= None, party_ref=None, quickbooks_settings= None, debit_in_account_currency=None, credit_in_account_currency=None, exchange_rate = None, is_advance= None):
-	account = exp.append("accounts", {})
-	account.party_type =  party_ref.get('party_type')
-	account.party = party_ref.get('name')
-	account.is_advance = is_advance
-	account.exchange_rate = exchange_rate
-	get_creditors_debtors_account(account, party_ref, quickbooks_settings)
-	if debit_in_account_currency!= None and debit_in_account_currency != 0:
-		account.debit_in_account_currency = flt(debit_in_account_currency , account.precision("debit_in_account_currency"))
-		
-	if credit_in_account_currency != None and credit_in_account_currency != 0:
-		account.credit_in_account_currency = flt(credit_in_account_currency , account.precision("credit_in_account_currency"))
-
 def get_creditors_debtors_account(account, party_ref, quickbooks_settings):
 	if party_ref.get('party_type') == 'Supplier':
 		debtors_account = frappe.db.get_value("Account", {"account_currency": party_ref.get('default_currency'), 'account_type': 'Payable', "root_type": "Liability"}, "name")
 		account.account = debtors_account if debtors_account else frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "default_payable_account")
 		account.account_currency = party_ref.get('default_currency')
-		# print account.account, "--------------------",account.account_currency
 	elif party_ref.get('party_type') == 'Customer':
 		creditors_account = frappe.db.get_value("Account", {"account_currency": party_ref.get('default_currency'), 'account_type': 'Receivable', "root_type": "Asset"}, "name")
 		account.account = creditors_account if creditors_account else frappe.db.get_value("Company", {"name": quickbooks_settings.select_company}, "default_receivable_account")
@@ -187,8 +194,14 @@ def get_account_detail(quickbooks_account_id):
 
 def get_tax_account(expenses, quickbooks_tax_rate_id, quickbooks_settings):
 	if not expenses.get('GlobalTaxCalculation') == 'NotApplicable':
-		individual_item_tax =  frappe.db.sql("""select qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent 
-					from  `tabQuickBooks TaxRate` as qbr where qbr.tax_rate_id = {}""".format(quickbooks_tax_rate_id),as_dict=1)
+		query = """
+				select 
+					qbr.name, qbr.display_name as tax_head, qbr.rate_value as tax_percent 
+				from 
+					`tabQuickBooks TaxRate` as qbr 
+				where 
+					qbr.tax_rate_id = {}""".format(quickbooks_tax_rate_id)
+		individual_item_tax =  frappe.db.sql(query, as_dict=1)
 		tax_head = individual_item_tax[0]['tax_head']
 		tax_account = get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings)
 	return tax_account
@@ -201,6 +214,30 @@ def get_tax_head_mapped_to_particular_account(tax_head, quickbooks_settings):
 		account_head_erpnext = quickbooks_settings.undefined_tax_account
 	account_head_erpnext = frappe.db.get_value("Account", {"name": account_head_erpnext}, ["name", "account_currency"], as_dict=1)
 	return account_head_erpnext
+
+
+# def party_debit(exp, expenses, party_ref, quickbooks_settings, company_currency):
+# 	# total_tax = expenses.get('TxnTaxDetail').get('TotalTax') if expenses.get('TxnTaxDetail') else 0
+# 	if party_ref.get('default_currency') == company_currency:
+# 		exchange_rate = 1
+# 		debit_amount = expenses.get('TotalAmt') * expenses.get('ExchangeRate')
+# 	else:
+# 		exchange_rate = expenses.get('ExchangeRate')
+# 		debit_amount = expenses.get('TotalAmt')
+	
+# 	if party_ref:
+# 		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings = quickbooks_settings, debit_in_account_currency=debit_amount , credit_in_account_currency = None, exchange_rate = exchange_rate, is_advance= "Yes")
+
+# def party_credit(exp, expenses, party_ref, quickbooks_settings, company_currency):
+# 	if party_ref.get('default_currency') == company_currency:
+# 		exchange_rate = 1
+# 		credit_amount =  expenses.get('TotalAmt')  * expenses.get('ExchangeRate')
+# 	else:
+# 		exchange_rate = expenses.get('ExchangeRate')
+# 		credit_amount = expenses.get('TotalAmt')
+
+# 	if party_ref:
+# 		append_row_party_detail(exp = exp, party_ref= party_ref, quickbooks_settings= quickbooks_settings, debit_in_account_currency=None , credit_in_account_currency = credit_amount, exchange_rate = exchange_rate, is_advance= "No")
 
 # def get_party_type(expenses):
 # 	# u'EntityRef': {u'type': u'Vendor', u'name': u'Supplier 4', u'value': u'9'}

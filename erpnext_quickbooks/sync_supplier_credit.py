@@ -59,6 +59,7 @@ def create_supplier_credit(qb_supplier_credit, quickbooks_settings, quickbooks_s
 	if not stock_entry:
 		stock_entry = frappe.get_doc({
 			"doctype": "Stock Entry",
+			"naming_series" : "DN-SE-QB-",
 			"quickbooks_credit_memo_id" : str(qb_supplier_credit.get("Id"))+"-"+"DN",
 			"posting_date" : qb_supplier_credit.get('TxnDate'),
 			"purpose": "Material Receipt",
@@ -172,7 +173,7 @@ def append_row_credit_detail_pi(stock_entry= None, qb_supplier_credits = None, r
 	company_name = quickbooks_settings.select_company
 	company_currency = frappe.db.get_value("Company", {"name": company_name}, "default_currency")
 
-	account =stock_entry.append("accounts", {})
+	account = stock_entry.append("accounts", {})
 	account_ref1 = quickbooks_settings.bank_account
 	account_ref = get_account_detail(account_ref1)
 	if account_ref.get('account_currency') == company_currency:
